@@ -1,0 +1,87 @@
+﻿<div id="view-debug" class="view">
+<div class="panel" id="panel-trace">
+  <div class="panel-hdr">
+    <h2>🔬 Primera Iteración — Dígito 7
+      <span style="background:rgba(255,101,132,.15);color:var(--accent2);border-radius:6px;padding:2px 10px;font-size:.75rem;margin-left:8px;">Pesos aleatorios — Red sin entrenar (semilla 42)</span>
+    </h2>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-secondary btn-sm" onclick="loadDebug7()">&#8635; Recalcular</button>
+    </div>
+  </div>
+  <div class="panel-body">
+
+    <!-- Resumen -->
+    <div class="trace-summary" style="margin-bottom:16px;">
+      <div class="ts-item"><span class="ts-label">Dígito predicho</span><span class="ts-val" id="tr-digit">—</span></div>
+      <div class="ts-item"><span class="ts-label">Loss ½Σe²</span><span class="ts-val" id="tr-loss" style="color:var(--yellow);">—</span></div>
+      <div class="ts-item"><span class="ts-label">Conf. máx. output</span><span class="ts-val" id="tr-max-out" style="color:var(--green);">—</span></div>
+      <div class="ts-item"><span class="ts-label">η (tasa aprendizaje)</span><span class="ts-val" id="tr-eta" style="color:var(--accent);">—</span></div>
+      <div class="ts-item"><span class="ts-label">Semilla aleatoria</span><span class="ts-val" id="tr-semilla" style="color:var(--muted);">42</span></div>
+      <div class="ts-item" style="margin-left:auto;"><span class="ts-label">Hidden activos &gt;0.5</span><span class="ts-val" id="tr-hidden-active" style="color:var(--accent2);">—</span></div>
+    </div>
+
+    <!-- Fila: Imagen + Tabla entradas -->
+    <div class="debug-row">
+
+      <!-- Imagen 28×28 -->
+      <div style="flex-shrink:0;">
+        <span class="debug-section-title">📥 Dígito 7 real — MNIST (28×28)</span>
+        <canvas id="trace-input-canvas" width="280" height="280"
+          style="border:1px solid var(--border);border-radius:6px;cursor:crosshair;display:block;image-rendering:pixelated;"></canvas>
+        <div class="trace-pixel-info" id="trace-pixel-info">Pasa el mouse para ver el valor del píxel</div>
+      </div>
+
+      <!-- Tabla entradas -->
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span class="debug-section-title" style="margin:0;">📊 Entradas — 784 píxeles</span>
+          <button class="toggle-btn" id="btn-toggle-inputs" onclick="toggleInputTable()">Solo activos</button>
+        </div>
+        <div class="trace-table-wrap" style="max-height:308px;">
+          <table class="trace-table">
+            <thead><tr><th>idx</th><th>fila</th><th>col</th><th>x_i</th></tr></thead>
+            <tbody id="debug-input-tbody">
+              <tr><td colspan="4" class="trace-placeholder">Cargando MNIST…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Capa Hidden -->
+    <span class="debug-section-title">🧠 Capa Hidden — 64 nodos
+      <span style="font-weight:400;font-size:.65rem;margin-left:6px;">Clic en 🔍 para ver los 784 pesos de entrada y los 10 ΔW de salida</span>
+    </span>
+    <div class="trace-table-wrap" style="max-height:290px;margin-bottom:16px;">
+      <table class="trace-table">
+        <thead><tr>
+          <th>j</th><th>z = Σ(x·w)</th><th>σ(z)</th><th>σ'(z) = σ(1-σ)</th><th>error backprop</th><th>detalle</th>
+        </tr></thead>
+        <tbody id="trace-hidden-tbody">
+          <tr><td colspan="6" class="trace-placeholder">Cargando dígito 7…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Capa Output -->
+    <span class="debug-section-title">📤 Capa Output — 10 nodos
+      <span style="font-weight:400;font-size:.65rem;margin-left:6px;">Clic en 🔍 para ver los 64 pesos, contribuciones z y ΔW por conexión</span>
+    </span>
+    <table class="trace-table" style="margin-bottom:12px;">
+      <thead><tr>
+        <th>k</th><th>z = Σ(h·w)</th><th>σ(z)</th><th>σ'(z)</th><th>esperado</th><th>error = esp−σ</th><th>½e²</th><th>detalle</th>
+      </tr></thead>
+      <tbody id="trace-output-tbody">
+        <tr><td colspan="8" class="trace-placeholder">Cargando dígito 7…</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Loss box -->
+    <div class="trace-loss-box">
+      Pérdida total = ½ × Σ(esp − σ(z))² = <strong id="tr-loss-val">—</strong>
+      &nbsp;·&nbsp; η = <span id="tr-eta2">—</span>
+    </div>
+
+  </div><!-- /.panel-body -->
+</div><!-- /#panel-trace -->
+</div><!-- /#view-debug -->

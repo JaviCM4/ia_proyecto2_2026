@@ -1,0 +1,149 @@
+﻿<div id="view-train" class="view">
+
+<div class="train-top">
+
+<!-- ═══════════════════════  PANEL ENTRENAMIENTO  ═══════════════════════════ -->
+<div class="panel">
+  <div class="panel-hdr" style="flex-wrap:wrap;gap:8px;">
+    <h2>⚙ Entrenamiento</h2>
+    <div class="mode-tabs">
+      <button id="btn-mode-speed" class="mode-tab active" onclick="setTrainMode('speed')">⚡ Velocidad</button>
+      <button id="btn-mode-edu"   class="mode-tab"        onclick="setTrainMode('edu')">🎓 Educativo</button>
+    </div>
+  </div>
+  <div class="panel-body">
+
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="val" id="s-epoch">{{ epocas_entrenadas or '—' }}</div>
+        <div class="lbl">Época</div>
+      </div>
+      <div class="stat-box">
+        <div class="val" id="s-loss">{{ last_loss or '—' }}</div>
+        <div class="lbl">Loss</div>
+      </div>
+      <div class="stat-box">
+        <div class="val" id="s-acc">{{ (last_acc|string + '%') if last_acc else '—' }}</div>
+        <div class="lbl">Accuracy</div>
+      </div>
+    </div>
+
+    <!-- MODO VELOCIDAD -->
+    <div id="speed-content">
+
+      <div class="form-group">
+        <label>Épocas</label>
+        <input type="number" id="inp-epocas" value="10" min="1" max="100">
+      </div>
+
+      <div class="form-group">
+        <label>Tasa de aprendizaje: <span id="tasa-lbl">0.1000</span></label>
+        <input type="range" id="inp-tasa" min="-3" max="0" step="0.1" value="-1"
+               oninput="document.getElementById('tasa-lbl').textContent=Math.pow(10,+this.value).toFixed(4)">
+        <div class="range-val" id="tasa-val">η = 0.1000</div>
+      </div>
+
+      <div class="progress-wrap" id="prog-wrap">
+        <div class="progress-track">
+          <div class="progress-fill" id="prog-fill"></div>
+        </div>
+        <div id="status-msg">Iniciando...</div>
+      </div>
+
+      <div class="btn-row" style="margin-top:12px;">
+        <button class="btn btn-primary" id="btn-train" onclick="startTraining()">▶ Entrenar</button>
+      </div>
+
+    </div><!-- /#speed-content -->
+
+    <!-- MODO EDUCATIVO -->
+    <div id="edu-content" style="display:none;">
+
+      <div class="form-group">
+        <label>Selecciona el dígito de muestra</label>
+        <div class="digit-sel-grid">
+          <button class="digit-sel-btn active" id="edu-d-rnd" onclick="setEduDigit(-1)">🎲</button>
+          <button class="digit-sel-btn" id="edu-d-0" onclick="setEduDigit(0)">0</button>
+          <button class="digit-sel-btn" id="edu-d-1" onclick="setEduDigit(1)">1</button>
+          <button class="digit-sel-btn" id="edu-d-2" onclick="setEduDigit(2)">2</button>
+          <button class="digit-sel-btn" id="edu-d-3" onclick="setEduDigit(3)">3</button>
+          <button class="digit-sel-btn" id="edu-d-4" onclick="setEduDigit(4)">4</button>
+          <button class="digit-sel-btn" id="edu-d-5" onclick="setEduDigit(5)">5</button>
+          <button class="digit-sel-btn" id="edu-d-6" onclick="setEduDigit(6)">6</button>
+          <button class="digit-sel-btn" id="edu-d-7" onclick="setEduDigit(7)">7</button>
+          <button class="digit-sel-btn" id="edu-d-8" onclick="setEduDigit(8)">8</button>
+          <button class="digit-sel-btn" id="edu-d-9" onclick="setEduDigit(9)">9</button>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-edu-load" onclick="loadEduSample()">▶ Cargar muestra</button>
+      </div>
+      <div id="edu-status" style="font-size:.75rem;color:var(--muted);margin-top:8px;min-height:18px;"></div>
+
+    </div><!-- /#edu-content -->
+
+  </div>
+</div>
+
+<!-- ═══════════════════════  PANEL GRÁFICA DE COSTO  ═══════════════════════ -->
+<div class="panel" id="panel-chart">
+  <div class="panel-hdr">
+    <h2>📈 Curva de Costo</h2>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-dot" style="background:var(--accent)"></span>Loss</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--green)"></span>Accuracy /100</span>
+    </div>
+  </div>
+  <div class="panel-body" style="padding:12px;">
+    <canvas id="loss-canvas" height="210"></canvas>
+  </div>
+</div>
+
+</div><!-- /.train-top -->
+
+<!-- ══════════════════  VISUALIZACIÓN DE LA RED (movida aquí)  ═══════════════ -->
+<div class="panel" id="panel-network" style="margin-top:16px;display:none;">
+  <div class="panel-hdr">
+    <h2>🕸 Visualización de la Red</h2>
+    <button class="btn btn-secondary btn-sm" onclick="refreshNetwork()">↻ Actualizar</button>
+  </div>
+  <div class="panel-body" style="padding:10px;">
+    <canvas id="net-canvas" height="460"></canvas>
+  </div>
+</div>
+
+<!-- ═══════════════════  MODO EDUCATIVO — PASOS  ════════════════════════════ -->
+<div class="panel" id="panel-edu-steps" style="display:none;margin-top:16px;">
+  <div class="panel-hdr">
+    <h2>🎓 Modo Educativo — <span id="edu-hdr-label">Dígito ?</span></h2>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span id="edu-loss-badge" style="font-size:.75rem;padding:3px 10px;background:rgba(255,212,96,.1);color:var(--yellow);border-radius:6px;">Loss: —</span>
+      <button class="btn btn-secondary btn-sm" onclick="loadEduSample()">↻ Nueva muestra</button>
+    </div>
+  </div>
+  <div class="panel-body">
+
+    <!-- Stepper indicador de pasos -->
+    <div class="edu-stepper" id="edu-stepper"></div>
+
+    <!-- Contenido del paso activo -->
+    <div id="edu-step-area" style="min-height:260px;"></div>
+
+    <!-- Navegación -->
+    <div style="display:flex;gap:8px;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">
+      <button class="btn btn-secondary" id="btn-edu-prev" onclick="eduPrev()" disabled>← Anterior</button>
+      <span id="edu-step-label" style="flex:1;text-align:center;color:var(--muted);font-size:.8rem;"></span>
+      <button class="btn btn-primary"   id="btn-edu-next"  onclick="eduNext()">Siguiente →</button>
+      <button id="btn-edu-apply" onclick="eduApply()" disabled
+        style="background:rgba(67,233,123,.1);color:var(--green);border:1px solid rgba(67,233,123,.4);
+               border-radius:8px;padding:10px 16px;font-weight:600;cursor:pointer;font-size:.88rem;
+               opacity:.45;transition:.2s;">
+        ✓ Aplicar Pesos
+      </button>
+    </div>
+
+  </div>
+</div>
+
+</div><!-- /#view-train -->

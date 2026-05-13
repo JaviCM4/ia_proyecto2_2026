@@ -233,8 +233,7 @@ def procesar_frame(frame):
 
     # 6. Normalizar
     vector = (imagen_28.flatten() / 255.0).astype(np.float32)
-    print(f"[procesar_frame] Píxeles activos >0.5: {(vector > 0.5).sum()}")
-    return vector
+    return vector, imagen_28
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -341,13 +340,8 @@ def api_predict():
     except Exception as e:
         return jsonify({"error": f"Error al decodificar imagen: {e}"}), 400
 
-    # ── Preprocesado usando procesar_frame() (guarda debug_1..4 en cada llamada)
-    vector = procesar_frame(img_bgr)
-
-    # Preview: leer debug_4_28x28.png ya guardado por procesar_frame()
-    img_28_preview = cv2.imread("debug_4_28x28.png", cv2.IMREAD_GRAYSCALE)
-    if img_28_preview is None:
-        img_28_preview = np.zeros((28, 28), dtype=np.uint8)
+    # ── Preprocesado
+    vector, img_28_preview = procesar_frame(img_bgr)
 
     with S.lock:
         digito, activaciones = S.red.predecir_con_confianza(vector)
@@ -394,13 +388,6 @@ def api_predict():
     # Preview 28×28 como PNG base64
     _, buf  = cv2.imencode(".png", img_28_preview)
     preview_b64 = base64.b64encode(buf.tobytes()).decode()
-
-    print(f"[DEBUG] Shape: {vector.shape}")
-    print(f"[DEBUG] Min: {vector.min():.4f}  Max: {vector.max():.4f}")
-    print(f"[DEBUG] Píxeles activos >0.5: {(vector > 0.5).sum()}")
-    print(f"[DEBUG] Píxeles activos >0.1: {(vector > 0.1).sum()}")
-    print(f"[DEBUG] Predicción: {digito}")
-    print(f"[DEBUG] Activaciones output: {[round(float(a),3) for a in activaciones]}")
 
     return jsonify({
         "digito"      : int(digito),
