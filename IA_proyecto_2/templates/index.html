@@ -1,0 +1,2062 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Red Neuronal — Reconocimiento de Dígitos</title>
+  <style>
+    /* ── Variables ────────────────────────────────────────────────────────── */
+    :root {
+      --bg        : #0d0f1a;
+      --surface   : #141627;
+      --surface2  : #1e2136;
+      --surface3  : #252840;
+      --accent    : #6c63ff;
+      --accent2   : #ff6584;
+      --green     : #43e97b;
+      --yellow    : #ffd460;
+      --text      : #e0e0f0;
+      --muted     : #6a6a8a;
+      --border    : #252840;
+      --radius    : 12px;
+      --shadow    : 0 4px 24px rgba(0,0,0,.4);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background  : var(--bg);
+      color       : var(--text);
+      font-family : 'Segoe UI', system-ui, sans-serif;
+      min-height  : 100vh;
+      font-size   : 14px;
+    }
+
+    /* ── Header ───────────────────────────────────────────────────────────── */
+    header {
+      background    : var(--surface);
+      border-bottom : 1px solid var(--border);
+      padding       : 14px 28px;
+      display       : flex;
+      align-items   : center;
+      gap           : 16px;
+      flex-wrap     : wrap;
+    }
+    header h1 { font-size: 1.25rem; font-weight: 700; }
+    header p  { color: var(--muted); font-size: 0.8rem; }
+    .badge {
+      padding       : 4px 14px;
+      border-radius : 20px;
+      font-size     : 0.75rem;
+      font-weight   : 600;
+      margin-left   : auto;
+    }
+    .badge-green { background: rgba(67,233,123,.15); color: var(--green); }
+    .badge-gray  { background: rgba(106,106,138,.15); color: var(--muted); }
+
+    /* ── Navegación (tabs) ──────────────────────────────────────────────────── */
+    .app-nav {
+      display        : flex;
+      gap            : 2px;
+      padding        : 0 28px;
+      background     : var(--surface);
+      border-bottom  : 1px solid var(--border);
+    }
+    .nav-tab {
+      padding        : 11px 22px;
+      border         : none;
+      border-bottom  : 3px solid transparent;
+      background     : transparent;
+      color          : var(--muted);
+      font-size      : .88rem;
+      font-weight    : 600;
+      cursor         : pointer;
+      transition     : color .2s, border-color .2s;
+      border-radius  : 0;
+    }
+    .nav-tab:hover  { color: var(--text); }
+    .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── Layout principal ────────────────────────────────────────────────────── */
+    main {
+      max-width : 1440px;
+      margin    : 0 auto;
+      padding   : 16px;
+    }
+    .view          { display: none; }
+    .view.active   { display: block; }
+    .view-2col.active { display: grid; }   /* grid > block cuando aplican ambas */
+    .view-2col {
+      grid-template-columns : 360px 1fr;
+      gap                   : 16px;
+    }
+
+    /* ── Panel base ───────────────────────────────────────────────────────── */
+    .panel {
+      background    : var(--surface);
+      border        : 1px solid var(--border);
+      border-radius : var(--radius);
+      overflow      : hidden;
+      box-shadow    : var(--shadow);
+    }
+    .panel-hdr {
+      padding        : 13px 18px;
+      border-bottom  : 1px solid var(--border);
+      display        : flex;
+      align-items    : center;
+      justify-content: space-between;
+    }
+    .panel-hdr h2 {
+      font-size   : 0.9rem;
+      font-weight : 600;
+      display     : flex;
+      align-items : center;
+      gap         : 7px;
+    }
+    .panel-body { padding: 18px; }
+
+    /* ── Inputs & botones ─────────────────────────────────────────────────── */
+    label {
+      display        : block;
+      font-size      : 0.72rem;
+      color          : var(--muted);
+      text-transform : uppercase;
+      letter-spacing : .06em;
+      margin-bottom  : 5px;
+    }
+    input[type=number] {
+      width         : 100%;
+      background    : var(--surface2);
+      border        : 1px solid var(--border);
+      border-radius : 8px;
+      color         : var(--text);
+      padding       : 9px 12px;
+      font-size     : 0.9rem;
+      outline       : none;
+      transition    : border-color .2s;
+    }
+    input[type=number]:focus { border-color: var(--accent); }
+
+    input[type=range] {
+      width         : 100%;
+      accent-color  : var(--accent);
+      cursor        : pointer;
+      margin-top    : 2px;
+    }
+    .form-group { margin-bottom: 14px; }
+    .range-val  { text-align: right; color: var(--accent); font-weight: 600; font-size: .82rem; margin-top: 3px; }
+
+    .btn {
+      padding       : 10px 16px;
+      border        : none;
+      border-radius : 8px;
+      font-size     : .88rem;
+      font-weight   : 600;
+      cursor        : pointer;
+      transition    : opacity .2s, transform .1s;
+      text-align    : center;
+    }
+    .btn:active   { transform: scale(.97); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary  { background: linear-gradient(135deg,var(--accent),#8a84ff); color:#fff; }
+    .btn-secondary{ background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-sm       { padding: 5px 12px; font-size: .78rem; }
+    .btn-row      { display: flex; gap: 8px; }
+    .btn-row .btn { flex: 1; }
+
+    /* ── Stats row ────────────────────────────────────────────────────────── */
+    .stats-row { display: flex; gap: 8px; margin-bottom: 14px; }
+    .stat-box {
+      flex          : 1;
+      background    : var(--surface2);
+      border-radius : 8px;
+      padding       : 10px 8px;
+      text-align    : center;
+    }
+    .stat-box .val { font-size: 1.15rem; font-weight: 700; color: var(--accent); line-height: 1.2; }
+    .stat-box .lbl { font-size: .65rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+
+    /* ── Progress ─────────────────────────────────────────────────────────── */
+    .progress-wrap { margin: 12px 0; display: none; }
+    .progress-track {
+      background    : var(--surface2);
+      border-radius : 6px;
+      height        : 7px;
+      overflow      : hidden;
+      margin-bottom : 7px;
+    }
+    .progress-fill {
+      height     : 100%;
+      background : linear-gradient(90deg, var(--accent), var(--green));
+      border-radius: 6px;
+      transition : width .4s ease;
+      width      : 0%;
+    }
+    #status-msg { font-size: .78rem; color: var(--muted); min-height: 20px; }
+
+    /* ── Chart ────────────────────────────────────────────────────────────── */
+    #panel-chart { grid-column: 2; grid-row: 1; }
+    #loss-canvas { display: block; width: 100%; }
+    .legend {
+      display    : flex;
+      gap        : 16px;
+      font-size  : .72rem;
+      color      : var(--muted);
+    }
+    .legend-item { display: flex; align-items: center; gap: 5px; }
+    .legend-dot  { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Camera ───────────────────────────────────────────────────────────── */
+    .video-wrap {
+      position      : relative;
+      background    : #000;
+      border-radius : 8px;
+      overflow      : hidden;
+      aspect-ratio  : 4/3;
+      margin-bottom : 10px;
+    }
+    #video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .video-placeholder {
+      position       : absolute;
+      inset          : 0;
+      display        : flex;
+      flex-direction : column;
+      align-items    : center;
+      justify-content: center;
+      color          : var(--muted);
+      gap            : 8px;
+      font-size      : .82rem;
+      pointer-events : none;
+    }
+    .cam-icon { font-size: 2.2rem; }
+
+    /* ── Prediction ───────────────────────────────────────────────────────── */
+    .pred-wrap { margin-top: 12px; display: none; }
+    .preview-row {
+      display     : flex;
+      gap         : 12px;
+      align-items : center;
+      margin-bottom: 12px;
+    }
+    #preview-img {
+      width            : 80px;
+      height           : 80px;
+      image-rendering  : pixelated;
+      border-radius    : 8px;
+      border           : 2px solid var(--border);
+      background       : #000;
+    }
+    .digit-big {
+      font-size   : 4.5rem;
+      font-weight : 900;
+      color       : var(--accent);
+      line-height : 1;
+      text-shadow : 0 0 30px rgba(108,99,255,.45);
+    }
+    .digit-label { font-size: .72rem; color: var(--muted); margin-top: 4px; }
+
+    .conf-bars { display: flex; flex-direction: column; gap: 3px; }
+    .conf-row {
+      display               : grid;
+      grid-template-columns : 18px 1fr 46px;
+      align-items           : center;
+      gap                   : 7px;
+      font-size             : .75rem;
+    }
+    .conf-track {
+      background    : var(--surface2);
+      border-radius : 4px;
+      height        : 12px;
+      overflow      : hidden;
+    }
+    .conf-fill {
+      height        : 100%;
+      border-radius : 4px;
+      transition    : width .35s ease;
+    }
+
+    /* ── Network visualization ────────────────────────────────────────────── */
+    #net-canvas    { display: block; width: 100%; }
+
+    /* ── Traza de Propagación ─────────────────────────────────────────────── */
+    .trace-summary {
+      display       : flex;
+      gap           : 24px;
+      align-items   : center;
+      padding       : 10px 14px;
+      background    : var(--surface2);
+      border-radius : 8px;
+      margin-bottom : 16px;
+      flex-wrap     : wrap;
+    }
+    .ts-item  { display: flex; flex-direction: column; gap: 2px; }
+    .ts-label { font-size: .65rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .ts-val   { font-size: 1.15rem; font-weight: 700; color: var(--accent); }
+
+    .trace-grid {
+      display               : grid;
+      grid-template-columns : 300px 1fr 340px;
+      gap                   : 16px;
+      align-items           : start;
+    }
+    @media (max-width: 1100px) { .trace-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width:  700px) { .trace-grid { grid-template-columns: 1fr; } }
+
+    .trace-section h3 {
+      font-size     : .78rem;
+      font-weight   : 600;
+      color         : var(--muted);
+      margin-bottom : 10px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .trace-table-wrap {
+      max-height    : 340px;
+      overflow-y    : auto;
+      border-radius : 6px;
+      border        : 1px solid var(--border);
+    }
+    .trace-table {
+      width           : 100%;
+      border-collapse : collapse;
+      font-size       : .72rem;
+      font-family     : 'Consolas', monospace;
+    }
+    .trace-table th {
+      background    : var(--surface3);
+      padding       : 6px 8px;
+      text-align    : left;
+      font-size     : .65rem;
+      color         : var(--muted);
+      text-transform: uppercase;
+      position      : sticky;
+      top           : 0;
+      z-index       : 1;
+    }
+    .trace-table td   { padding: 4px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .trace-table tr:hover td  { background: var(--surface2); }
+    .trace-table .tr-winner td{ background: rgba(108,99,255,.13); font-weight: 600; }
+    .trace-bar {
+      display        : inline-block;
+      height         : 8px;
+      border-radius  : 3px;
+      vertical-align : middle;
+      margin-right   : 5px;
+      min-width      : 2px;
+    }
+    .trace-loss-box {
+      margin-top    : 12px;
+      padding       : 10px 14px;
+      background    : var(--surface2);
+      border-radius : 6px;
+      font-size     : .82rem;
+      border-left   : 3px solid var(--yellow);
+    }
+    .trace-loss-box strong { color: var(--yellow); font-size: 1rem; }
+    .trace-pixel-info { font-size: .7rem; color: var(--muted); margin-top: 5px; min-height: 16px; }
+    .trace-placeholder { text-align: center; color: var(--muted); font-size: .8rem; padding: 24px 8px; }
+
+    /* ── Debug layout ────────────────────────────────────────────────── */
+    .debug-row { display:flex; gap:16px; align-items:flex-start; margin-bottom:16px; }
+    @media (max-width:700px) { .debug-row { flex-direction:column; } }
+    .debug-section-title {
+      font-size:.78rem; font-weight:600; color:var(--muted);
+      text-transform:uppercase; letter-spacing:.06em;
+      margin-bottom:8px; display:block;
+    }
+    .toggle-btn {
+      background:var(--surface2); border:1px solid var(--border); border-radius:5px;
+      color:var(--muted); font-size:.68rem; padding:3px 9px; cursor:pointer;
+    }
+    .toggle-btn:hover { background:var(--surface3); color:var(--text); }
+
+    /* ── Modal ───────────────────────────────────────────────────────── */
+    .modal-overlay {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.8);
+      z-index:1000; align-items:center; justify-content:center;
+    }
+    .modal-overlay.open { display:flex; }
+    .modal-box {
+      background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+      width:min(960px,96vw); max-height:88vh;
+      display:flex; flex-direction:column; overflow:hidden;
+      box-shadow:0 8px 48px rgba(0,0,0,.7);
+    }
+    .modal-hdr {
+      padding:13px 18px; border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+    }
+    .modal-hdr h3 { font-size:.95rem; font-weight:700; }
+    .modal-body   { overflow-y:auto; padding:16px; flex:1; }
+    .modal-close  {
+      background:none; border:none; color:var(--muted); font-size:1.3rem;
+      cursor:pointer; padding:3px 10px; border-radius:6px;
+    }
+    .modal-close:hover { background:var(--surface2); color:var(--text); }
+    .modal-summary {
+      display:flex; gap:14px; flex-wrap:wrap; padding:10px 14px;
+      background:var(--surface2); border-radius:8px; margin-bottom:14px;
+    }
+    .modal-section-title {
+      font-size:.72rem; font-weight:600; color:var(--muted);
+      text-transform:uppercase; letter-spacing:.06em; margin:14px 0 7px; display:block;
+    }
+
+    /* ── Responsive ───────────────────────────────────────────────────────── */
+    @media (max-width: 860px) {
+      .view-2col { grid-template-columns: 1fr; }
+    }
+
+    /* ── Train top 2-col ─────────────────────────────────────────────────── */
+    .train-top {
+      display               : grid;
+      grid-template-columns : 360px 1fr;
+      gap                   : 16px;
+      margin-bottom         : 16px;
+    }
+    @media (max-width: 860px) { .train-top { grid-template-columns: 1fr; } }
+
+    /* ── Mode tabs (Velocidad / Educativo) ──────────────────────────────── */
+    .mode-tabs { display:flex; gap:2px; background:var(--surface2); border-radius:8px; padding:3px; }
+    .mode-tab  {
+      padding       : 5px 14px;
+      border        : none;
+      border-radius : 6px;
+      background    : transparent;
+      color         : var(--muted);
+      font-size     : .78rem;
+      font-weight   : 600;
+      cursor        : pointer;
+      transition    : .2s;
+    }
+    .mode-tab.active { background: var(--surface3); color: var(--text); }
+    .mode-tab:hover:not(.active) { color: var(--text); }
+
+    /* ── Digit selector ─────────────────────────────────────────────────── */
+    .digit-sel-grid {
+      display               : grid;
+      grid-template-columns : repeat(6, 1fr);
+      gap                   : 4px;
+      margin                : 8px 0;
+    }
+    .digit-sel-btn {
+      padding       : 7px 4px;
+      border        : 1px solid var(--border);
+      border-radius : 6px;
+      background    : var(--surface2);
+      color         : var(--text);
+      font-size     : .85rem;
+      font-weight   : 600;
+      cursor        : pointer;
+      transition    : .15s;
+      text-align    : center;
+    }
+    .digit-sel-btn:hover  { border-color: var(--accent); color: var(--accent); }
+    .digit-sel-btn.active { background: rgba(108,99,255,.15); border-color: var(--accent); color: var(--accent); }
+
+    /* ── Edu stepper ─────────────────────────────────────────────────────── */
+    .edu-stepper {
+      display     : flex;
+      align-items : center;
+      gap         : 0;
+      margin-bottom: 20px;
+      overflow-x  : auto;
+      padding-bottom: 4px;
+    }
+    .edu-step-item { display: flex; align-items: center; flex-shrink: 0; }
+    .edu-step-btn  {
+      display        : flex;
+      flex-direction : column;
+      align-items    : center;
+      gap            : 4px;
+      padding        : 6px 8px;
+      border         : none;
+      background     : none;
+      cursor         : pointer;
+      color          : var(--muted);
+      font-size      : .62rem;
+      transition     : .2s;
+    }
+    .edu-step-dot {
+      width         : 26px;
+      height        : 26px;
+      border-radius : 50%;
+      display       : flex;
+      align-items   : center;
+      justify-content: center;
+      font-size     : .72rem;
+      font-weight   : 700;
+      border        : 2px solid var(--border);
+      background    : var(--surface2);
+      color         : var(--muted);
+      transition    : .2s;
+    }
+    .edu-step-btn.active .edu-step-dot { border-color: var(--accent); background: var(--accent); color: #fff; }
+    .edu-step-btn.done   .edu-step-dot { border-color: var(--green); background: rgba(67,233,123,.15); color: var(--green); }
+    .edu-step-btn.active { color: var(--accent); }
+    .edu-step-btn.done   { color: var(--green); }
+    .edu-step-line { flex: 1; height: 2px; background: var(--border); min-width: 16px; transition: .3s; }
+    .edu-step-line.done { background: var(--green); }
+
+    /* ── Edu step content ────────────────────────────────────────────────── */
+    .edu-step-panel { animation: fadeInUp .2s ease; }
+    @keyframes fadeInUp {
+      from { opacity:0; transform:translateY(6px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .edu-explanation {
+      padding     : 10px 14px;
+      background  : rgba(108,99,255,.08);
+      border-left : 3px solid var(--accent);
+      border-radius: 6px;
+      font-size   : .82rem;
+      line-height : 1.6;
+      margin-bottom: 14px;
+    }
+    .edu-formula {
+      font-family   : 'Consolas', monospace;
+      color         : var(--accent);
+      background    : var(--surface2);
+      padding       : 4px 10px;
+      border-radius : 5px;
+      font-size     : .78rem;
+      display       : inline-block;
+      margin-top    : 6px;
+    }
+
+    /* ── Edu summary bar ────────────────────────────────────────────────── */
+    .edu-summary {
+      display       : flex;
+      gap           : 16px;
+      flex-wrap     : wrap;
+      background    : var(--surface2);
+      border-radius : 8px;
+      padding       : 10px 14px;
+      margin-bottom : 14px;
+    }
+    .edu-sum-item  { display: flex; flex-direction: column; gap: 2px; }
+    .edu-sum-label { font-size: .6rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .edu-sum-val   { font-size: 1rem; font-weight: 700; color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════  HEADER  ════════════════════════════════════ -->
+<header>
+  <div>
+    <h1>🧠 Red Neuronal — Reconocimiento de Dígitos</h1>
+    <p>MLP 784 → 64 → 10 &nbsp;·&nbsp; Sigmoid &nbsp;·&nbsp; SGD &nbsp;·&nbsp; MNIST</p>
+  </div>
+  <span id="badge-pesos" class="badge {{ 'badge-green' if pesos_exist else 'badge-gray' }}">
+    {{ '✓ Pesos cargados' if pesos_exist else '⚠ Sin pesos — entrena primero' }}
+  </span>
+</header>
+
+<!-- ═══════════════════════════  NAVEGACIÓN  ════════════════════════════════ -->
+<nav class="app-nav">
+  <button class="nav-tab" id="nav-train"   onclick="showView('train')">⚙ Entrenar</button>
+  <button class="nav-tab active" id="nav-predict" onclick="showView('predict')">📷 Predecir</button>
+  <button class="nav-tab" id="nav-debug"   onclick="showView('debug')">🔬 Debug — Dígito 7</button>
+</nav>
+
+<main>
+
+<!-- ══════════════════════  VISTA: ENTRENAR  ════════════════════════════════ -->
+<div id="view-train" class="view">
+
+<div class="train-top">
+
+<!-- ═══════════════════════  PANEL ENTRENAMIENTO  ═══════════════════════════ -->
+<div class="panel">
+  <div class="panel-hdr" style="flex-wrap:wrap;gap:8px;">
+    <h2>⚙ Entrenamiento</h2>
+    <div class="mode-tabs">
+      <button id="btn-mode-speed" class="mode-tab active" onclick="setTrainMode('speed')">⚡ Velocidad</button>
+      <button id="btn-mode-edu"   class="mode-tab"        onclick="setTrainMode('edu')">🎓 Educativo</button>
+    </div>
+  </div>
+  <div class="panel-body">
+
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="val" id="s-epoch">{{ epocas_entrenadas or '—' }}</div>
+        <div class="lbl">Época</div>
+      </div>
+      <div class="stat-box">
+        <div class="val" id="s-loss">{{ last_loss or '—' }}</div>
+        <div class="lbl">Loss</div>
+      </div>
+      <div class="stat-box">
+        <div class="val" id="s-acc">{{ (last_acc|string + '%') if last_acc else '—' }}</div>
+        <div class="lbl">Accuracy</div>
+      </div>
+    </div>
+
+    <!-- MODO VELOCIDAD -->
+    <div id="speed-content">
+
+      <div class="form-group">
+        <label>Épocas</label>
+        <input type="number" id="inp-epocas" value="10" min="1" max="100">
+      </div>
+
+      <div class="form-group">
+        <label>Tasa de aprendizaje: <span id="tasa-lbl">0.1000</span></label>
+        <input type="range" id="inp-tasa" min="-3" max="0" step="0.1" value="-1"
+               oninput="document.getElementById('tasa-lbl').textContent=Math.pow(10,+this.value).toFixed(4)">
+        <div class="range-val" id="tasa-val">η = 0.1000</div>
+      </div>
+
+      <div class="progress-wrap" id="prog-wrap">
+        <div class="progress-track">
+          <div class="progress-fill" id="prog-fill"></div>
+        </div>
+        <div id="status-msg">Iniciando...</div>
+      </div>
+
+      <div class="btn-row" style="margin-top:12px;">
+        <button class="btn btn-primary" id="btn-train" onclick="startTraining()">▶ Entrenar</button>
+      </div>
+
+    </div><!-- /#speed-content -->
+
+    <!-- MODO EDUCATIVO -->
+    <div id="edu-content" style="display:none;">
+
+      <div class="form-group">
+        <label>Selecciona el dígito de muestra</label>
+        <div class="digit-sel-grid">
+          <button class="digit-sel-btn active" id="edu-d-rnd" onclick="setEduDigit(-1)">🎲</button>
+          <button class="digit-sel-btn" id="edu-d-0" onclick="setEduDigit(0)">0</button>
+          <button class="digit-sel-btn" id="edu-d-1" onclick="setEduDigit(1)">1</button>
+          <button class="digit-sel-btn" id="edu-d-2" onclick="setEduDigit(2)">2</button>
+          <button class="digit-sel-btn" id="edu-d-3" onclick="setEduDigit(3)">3</button>
+          <button class="digit-sel-btn" id="edu-d-4" onclick="setEduDigit(4)">4</button>
+          <button class="digit-sel-btn" id="edu-d-5" onclick="setEduDigit(5)">5</button>
+          <button class="digit-sel-btn" id="edu-d-6" onclick="setEduDigit(6)">6</button>
+          <button class="digit-sel-btn" id="edu-d-7" onclick="setEduDigit(7)">7</button>
+          <button class="digit-sel-btn" id="edu-d-8" onclick="setEduDigit(8)">8</button>
+          <button class="digit-sel-btn" id="edu-d-9" onclick="setEduDigit(9)">9</button>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-edu-load" onclick="loadEduSample()">▶ Cargar muestra</button>
+      </div>
+      <div id="edu-status" style="font-size:.75rem;color:var(--muted);margin-top:8px;min-height:18px;"></div>
+
+    </div><!-- /#edu-content -->
+
+  </div>
+</div>
+
+<!-- ═══════════════════════  PANEL GRÁFICA DE COSTO  ═══════════════════════ -->
+<div class="panel" id="panel-chart">
+  <div class="panel-hdr">
+    <h2>📈 Curva de Costo</h2>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-dot" style="background:var(--accent)"></span>Loss</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--green)"></span>Accuracy /100</span>
+    </div>
+  </div>
+  <div class="panel-body" style="padding:12px;">
+    <canvas id="loss-canvas" height="210"></canvas>
+  </div>
+</div>
+
+</div><!-- /.train-top -->
+
+<!-- ══════════════════  VISUALIZACIÓN DE LA RED (movida aquí)  ═══════════════ -->
+<div class="panel" id="panel-network" style="margin-top:16px;display:none;">
+  <div class="panel-hdr">
+    <h2>🕸 Visualización de la Red</h2>
+    <button class="btn btn-secondary btn-sm" onclick="refreshNetwork()">↻ Actualizar</button>
+  </div>
+  <div class="panel-body" style="padding:10px;">
+    <canvas id="net-canvas" height="460"></canvas>
+  </div>
+</div>
+
+<!-- ═══════════════════  MODO EDUCATIVO — PASOS  ════════════════════════════ -->
+<div class="panel" id="panel-edu-steps" style="display:none;margin-top:16px;">
+  <div class="panel-hdr">
+    <h2>🎓 Modo Educativo — <span id="edu-hdr-label">Dígito ?</span></h2>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span id="edu-loss-badge" style="font-size:.75rem;padding:3px 10px;background:rgba(255,212,96,.1);color:var(--yellow);border-radius:6px;">Loss: —</span>
+      <button class="btn btn-secondary btn-sm" onclick="loadEduSample()">↻ Nueva muestra</button>
+    </div>
+  </div>
+  <div class="panel-body">
+
+    <!-- Stepper indicador de pasos -->
+    <div class="edu-stepper" id="edu-stepper"></div>
+
+    <!-- Contenido del paso activo -->
+    <div id="edu-step-area" style="min-height:260px;"></div>
+
+    <!-- Navegación -->
+    <div style="display:flex;gap:8px;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">
+      <button class="btn btn-secondary" id="btn-edu-prev" onclick="eduPrev()" disabled>← Anterior</button>
+      <span id="edu-step-label" style="flex:1;text-align:center;color:var(--muted);font-size:.8rem;"></span>
+      <button class="btn btn-primary"   id="btn-edu-next"  onclick="eduNext()">Siguiente →</button>
+      <button id="btn-edu-apply" onclick="eduApply()" disabled
+        style="background:rgba(67,233,123,.1);color:var(--green);border:1px solid rgba(67,233,123,.4);
+               border-radius:8px;padding:10px 16px;font-weight:600;cursor:pointer;font-size:.88rem;
+               opacity:.45;transition:.2s;">
+        ✓ Aplicar Pesos
+      </button>
+    </div>
+
+  </div>
+</div>
+
+</div><!-- /#view-train -->
+
+<!-- ══════════════════════  VISTA: PREDECIR  ════════════════════════════════ -->
+<div id="view-predict" class="view view-2col active">
+
+<!-- ═══════════════════════  PANEL CÁMARA  ══════════════════════════════════ -->
+<div class="panel" id="panel-camera">
+  <div class="panel-hdr">
+    <h2>📷 Cámara Web</h2>
+    <div style="display:flex;gap:6px;">
+      <button class="btn btn-secondary btn-sm" onclick="startAutoPredict()" id="btn-auto">🔄 Auto</button>
+    </div>
+  </div>
+  <div class="panel-body">
+
+    <div class="video-wrap">
+      <video id="video" autoplay muted playsinline></video>
+      <div class="video-placeholder" id="vid-placeholder">
+        <span class="cam-icon">📷</span>
+        <span>Activa la cámara para comenzar</span>
+      </div>
+    </div>
+
+    <div class="btn-row" style="margin-bottom:0;">
+      <button class="btn btn-secondary" onclick="startCamera()">Activar Cámara</button>
+      <button class="btn btn-primary" id="btn-cap" onclick="captureAndPredict()" disabled>🔍 Predecir</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════  PANEL PREDICCIÓN  ══════════════════════════════ -->
+<div class="panel" id="panel-pred">
+  <div class="panel-hdr">
+    <h2>🎯 Resultado</h2>
+  </div>
+  <div class="panel-body">
+
+    <div id="pred-placeholder" style="text-align:center;color:var(--muted);padding:40px 8px;font-size:.85rem;">
+      <div style="font-size:2.5rem;margin-bottom:8px;">🔢</div>
+      Captura una imagen para ver el resultado
+    </div>
+
+    <div class="pred-wrap" id="pred-wrap">
+      <div class="preview-row">
+        <img id="preview-img" alt="28×28">
+        <div>
+          <div class="digit-big" id="digit-big">?</div>
+          <div class="digit-label">Dígito predicho</div>
+        </div>
+      </div>
+      <div class="conf-bars" id="conf-bars"></div>
+    </div>
+
+  </div>
+</div>
+
+</div><!-- /#view-predict -->
+
+<!-- ══════════════════════  VISTA: DEBUG  ═══════════════════════════════════ -->
+<!-- ════════════════════════  VISTA: DEBUG  ═════════════════════════════════ -->
+<div id="view-debug" class="view">
+<div class="panel" id="panel-trace">
+  <div class="panel-hdr">
+    <h2>🔬 Primera Iteración — Dígito 7
+      <span style="background:rgba(255,101,132,.15);color:var(--accent2);border-radius:6px;padding:2px 10px;font-size:.75rem;margin-left:8px;">Pesos aleatorios — Red sin entrenar (semilla 42)</span>
+    </h2>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-secondary btn-sm" onclick="loadDebug7()">&#8635; Recalcular</button>
+    </div>
+  </div>
+  <div class="panel-body">
+
+    <!-- Resumen -->
+    <div class="trace-summary" style="margin-bottom:16px;">
+      <div class="ts-item"><span class="ts-label">Dígito predicho</span><span class="ts-val" id="tr-digit">—</span></div>
+      <div class="ts-item"><span class="ts-label">Loss ½Σe²</span><span class="ts-val" id="tr-loss" style="color:var(--yellow);">—</span></div>
+      <div class="ts-item"><span class="ts-label">Conf. máx. output</span><span class="ts-val" id="tr-max-out" style="color:var(--green);">—</span></div>
+      <div class="ts-item"><span class="ts-label">η (tasa aprendizaje)</span><span class="ts-val" id="tr-eta" style="color:var(--accent);">—</span></div>
+      <div class="ts-item"><span class="ts-label">Semilla aleatoria</span><span class="ts-val" id="tr-semilla" style="color:var(--muted);">42</span></div>
+      <div class="ts-item" style="margin-left:auto;"><span class="ts-label">Hidden activos &gt;0.5</span><span class="ts-val" id="tr-hidden-active" style="color:var(--accent2);">—</span></div>
+    </div>
+
+    <!-- Fila: Imagen + Tabla entradas -->
+    <div class="debug-row">
+
+      <!-- Imagen 28×28 -->
+      <div style="flex-shrink:0;">
+        <span class="debug-section-title">📥 Dígito 7 real — MNIST (28×28)</span>
+        <canvas id="trace-input-canvas" width="280" height="280"
+          style="border:1px solid var(--border);border-radius:6px;cursor:crosshair;display:block;image-rendering:pixelated;"></canvas>
+        <div class="trace-pixel-info" id="trace-pixel-info">Pasa el mouse para ver el valor del píxel</div>
+      </div>
+
+      <!-- Tabla entradas -->
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span class="debug-section-title" style="margin:0;">📊 Entradas — 784 píxeles</span>
+          <button class="toggle-btn" id="btn-toggle-inputs" onclick="toggleInputTable()">Solo activos</button>
+        </div>
+        <div class="trace-table-wrap" style="max-height:308px;">
+          <table class="trace-table">
+            <thead><tr><th>idx</th><th>fila</th><th>col</th><th>x_i</th></tr></thead>
+            <tbody id="debug-input-tbody">
+              <tr><td colspan="4" class="trace-placeholder">Cargando MNIST…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Capa Hidden -->
+    <span class="debug-section-title">🧠 Capa Hidden — 64 nodos
+      <span style="font-weight:400;font-size:.65rem;margin-left:6px;">Clic en 🔍 para ver los 784 pesos de entrada y los 10 ΔW de salida</span>
+    </span>
+    <div class="trace-table-wrap" style="max-height:290px;margin-bottom:16px;">
+      <table class="trace-table">
+        <thead><tr>
+          <th>j</th><th>z = Σ(x·w)</th><th>σ(z)</th><th>σ'(z) = σ(1-σ)</th><th>error backprop</th><th>detalle</th>
+        </tr></thead>
+        <tbody id="trace-hidden-tbody">
+          <tr><td colspan="6" class="trace-placeholder">Cargando dígito 7…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Capa Output -->
+    <span class="debug-section-title">📤 Capa Output — 10 nodos
+      <span style="font-weight:400;font-size:.65rem;margin-left:6px;">Clic en 🔍 para ver los 64 pesos, contribuciones z y ΔW por conexión</span>
+    </span>
+    <table class="trace-table" style="margin-bottom:12px;">
+      <thead><tr>
+        <th>k</th><th>z = Σ(h·w)</th><th>σ(z)</th><th>σ'(z)</th><th>esperado</th><th>error = esp−σ</th><th>½e²</th><th>detalle</th>
+      </tr></thead>
+      <tbody id="trace-output-tbody">
+        <tr><td colspan="8" class="trace-placeholder">Cargando dígito 7…</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Loss box -->
+    <div class="trace-loss-box">
+      Pérdida total = ½ × Σ(esp − σ(z))² = <strong id="tr-loss-val">—</strong>
+      &nbsp;·&nbsp; η = <span id="tr-eta2">—</span>
+    </div>
+
+  </div><!-- /.panel-body -->
+</div><!-- /#panel-trace -->
+</div><!-- /#view-debug -->
+
+</main>
+
+<!-- ════════════════════════  MODAL DETALLE NODO  ═══════════════════════ -->
+<div id="modal-overlay" class="modal-overlay" onclick="closeModalOutside(event)">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <h3 id="modal-title">Detalle del Nodo</h3>
+      <button class="modal-close" onclick="closeModal()">&#10005;</button>
+    </div>
+    <div class="modal-body" id="modal-content"></div>
+  </div>
+</div>
+
+<!-- Canvas oculto para captura de frame -->
+<canvas id="cap-canvas" style="display:none;"></canvas>
+
+<!-- ═══════════════════════════  JAVASCRIPT  ════════════════════════════════ -->
+<script>
+/* ─────────────────────────────────────────────────────────────────────────── *
+ *  Estado frontend
+ * ─────────────────────────────────────────────────────────────────────────── */
+const losses    = [];
+const accs      = [];
+let sseSource   = null;
+let camStream   = null;
+let autoTimer   = null;
+let autoActive  = false;
+
+/* ─────────────────────────────────────────────────────────────────────────── *
+ *  NAVEGACIÓN ENTRE VISTAS
+ * ─────────────────────────────────────────────────────────────────────────── */
+const VIEWS = ['train', 'predict', 'debug'];
+
+function showView(name) {
+  VIEWS.forEach(v => {
+    document.getElementById('view-' + v).classList.toggle('active', v === name);
+    const tab = document.getElementById('nav-' + v);
+    if (tab) tab.classList.toggle('active', v === name);
+  });
+
+  // Acciones al entrar a cada vista
+  if (name === 'train')   { drawLossChart(); refreshNetwork(); }
+  if (name === 'debug')   { loadDebug7(); }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── *
+ *  ENTRENAMIENTO  (SSE)
+ * ─────────────────────────────────────────────────────────────────────────── */
+function startTraining() {
+  const epocas = parseInt(document.getElementById('inp-epocas').value) || 10;
+  const tasa   = Math.pow(10, parseFloat(document.getElementById('inp-tasa').value));
+
+  losses.length = 0;
+  accs.length   = 0;
+  drawLossChart();
+
+  document.getElementById('btn-train').disabled = true;
+  document.getElementById('prog-wrap').style.display = 'block';
+  document.getElementById('status-msg').textContent  = 'Conectando...';
+
+  // 1. Abrir SSE
+  if (sseSource) sseSource.close();
+  sseSource = new EventSource('/api/train/stream');
+  sseSource.onmessage = onSSE;
+  sseSource.onerror   = () => {
+    document.getElementById('status-msg').textContent = '⚠ Error en la conexión SSE';
+  };
+
+  // 2. Lanzar entrenamiento
+  fetch('/api/train/start', {
+    method : 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body   : JSON.stringify({epocas, tasa}),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) {
+      document.getElementById('status-msg').textContent = '✗ ' + d.error;
+      document.getElementById('btn-train').disabled = false;
+      sseSource.close();
+    }
+  });
+}
+
+function onSSE(e) {
+  const d = JSON.parse(e.data);
+  if (d.heartbeat) return;
+
+  if (d.type === 'status') {
+    document.getElementById('status-msg').textContent = d.msg;
+  }
+  else if (d.type === 'epoch') {
+    losses.push(d.loss);
+    accs.push(d.accuracy);
+
+    document.getElementById('s-epoch').textContent = `${d.epoca}/${d.total}`;
+    document.getElementById('s-loss').textContent  = d.loss.toFixed(4);
+    document.getElementById('s-acc').textContent   = d.accuracy.toFixed(1) + '%';
+
+    const pct = (d.epoca / d.total * 100).toFixed(1);
+    document.getElementById('prog-fill').style.width = pct + '%';
+    document.getElementById('status-msg').textContent =
+      `Época ${d.epoca}/${d.total}  ·  Loss ${d.loss.toFixed(4)}  ·  Acc ${d.accuracy.toFixed(1)}%`;
+
+    drawLossChart();
+    // Actualizar red en cada época (igual que la gráfica de costo)
+    refreshNetwork();
+  }
+  else if (d.type === 'done') {
+    document.getElementById('status-msg').textContent =
+      `✓ Listo  ·  Accuracy test: ${d.acc_test}%`;
+    document.getElementById('badge-pesos').textContent = '✓ Pesos cargados';
+    document.getElementById('badge-pesos').className   = 'badge badge-green';
+    document.getElementById('btn-train').disabled = false;
+    sseSource.close();
+    refreshNetwork();
+  }
+  else if (d.type === 'network_update') {
+    refreshNetwork();
+  }
+  else if (d.type === 'error') {
+    document.getElementById('status-msg').textContent = '✗ Error: ' + d.msg;
+    document.getElementById('btn-train').disabled = false;
+    sseSource.close();
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── *
+ *  GRÁFICA DE COSTO  (Canvas puro)
+ * ─────────────────────────────────────────────────────────────────────────── */
+function drawLossChart() {
+  const canvas = document.getElementById('loss-canvas');
+  const dpr    = window.devicePixelRatio || 1;
+  const W      = canvas.parentElement.clientWidth - 24;
+  const H      = 210;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const pad = {t:20, r:16, b:38, l:52};
+  const iW  = W - pad.l - pad.r;
+  const iH  = H - pad.t - pad.b;
+
+  ctx.fillStyle = '#141627';
+  ctx.fillRect(0, 0, W, H);
+
+  if (losses.length === 0) {
+    ctx.fillStyle = '#6a6a8a'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Sin datos — comienza el entrenamiento', W/2, H/2);
+    return;
+  }
+
+  const maxL = Math.max(...losses, 0.01);
+  const n    = losses.length;
+  const xAt  = i => pad.l + (n > 1 ? i/(n-1) : 0.5) * iW;
+  const yAt  = v => pad.t + iH * (1 - v/maxL);
+
+  // Grid lines
+  ctx.strokeStyle = '#1e2136'; ctx.lineWidth = 1;
+  for (let k = 0; k <= 4; k++) {
+    const y = pad.t + iH * (k/4);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l+iW, y); ctx.stroke();
+    ctx.fillStyle = '#6a6a8a'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText((maxL*(1-k/4)).toFixed(3), pad.l-5, y+4);
+  }
+
+  // Accuracy area (scaled same axis)
+  if (accs.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(xAt(0), yAt(accs[0]/100*maxL));
+    for (let i=1;i<accs.length;i++) ctx.lineTo(xAt(i), yAt(accs[i]/100*maxL));
+    ctx.lineTo(xAt(accs.length-1), pad.t+iH); ctx.lineTo(xAt(0), pad.t+iH); ctx.closePath();
+    ctx.fillStyle = 'rgba(67,233,123,.1)'; ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(xAt(0), yAt(accs[0]/100*maxL));
+    for (let i=1;i<accs.length;i++) ctx.lineTo(xAt(i), yAt(accs[i]/100*maxL));
+    ctx.strokeStyle = '#43e97b'; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+
+  // Loss area + line
+  ctx.beginPath();
+  ctx.moveTo(xAt(0), yAt(losses[0]));
+  for (let i=1;i<n;i++) ctx.lineTo(xAt(i), yAt(losses[i]));
+  ctx.lineTo(xAt(n-1), pad.t+iH); ctx.lineTo(xAt(0), pad.t+iH); ctx.closePath();
+  ctx.fillStyle = 'rgba(108,99,255,.15)'; ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(xAt(0), yAt(losses[0]));
+  for (let i=1;i<n;i++) ctx.lineTo(xAt(i), yAt(losses[i]));
+  ctx.strokeStyle = '#6c63ff'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.stroke();
+
+  // Dot en último punto
+  ctx.beginPath(); ctx.arc(xAt(n-1), yAt(losses[n-1]), 4, 0, Math.PI*2);
+  ctx.fillStyle = '#6c63ff'; ctx.fill();
+
+  // X labels
+  ctx.fillStyle = '#6a6a8a'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+  const step = Math.max(1, Math.floor(n/6));
+  for (let i=0;i<n;i+=step) ctx.fillText('E'+(i+1), xAt(i), H-pad.b+16);
+
+  // Axis title
+  ctx.textAlign = 'center'; ctx.fillStyle = '#6a6a8a'; ctx.font = '10px sans-serif';
+  ctx.fillText('Épocas', W/2, H-4);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── *
+ *  CÁMARA
+ * ─────────────────────────────────────────────────────────────────────────── */
+async function startCamera() {
+  try {
+    if (camStream) camStream.getTracks().forEach(t => t.stop());
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: {width:{ideal:640}, height:{ideal:480}, facingMode:'environment'}
+    });
+    const vid = document.getElementById('video');
+    vid.srcObject = camStream;
+    document.getElementById('vid-placeholder').style.display = 'none';
+    document.getElementById('btn-cap').disabled = false;
+  } catch(err) {
+    alert('No se pudo acceder a la cámara:\n' + err.message);
+  }
+}
+
+function captureAndPredict() {
+  const vid = document.getElementById('video');
+  const cap = document.getElementById('cap-canvas');
+  cap.width  = vid.videoWidth  || 640;
+  cap.height = vid.videoHeight || 480;
+  cap.getContext('2d').drawImage(vid, 0, 0);
+
+  fetch('/api/predict', {
+    method : 'POST',
+    headers: {'Content-Type':'application/json'},
+    body   : JSON.stringify({image: cap.toDataURL('image/png')}),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) { console.error(d.error); return; }
+    showPrediction(d);
+    refreshNetwork();
+  })
+  .catch(e => console.error('predict error:', e));
+}
+
+function showPrediction(data) {
+  const ph = document.getElementById('pred-placeholder');
+  if (ph) ph.style.display = 'none';
+  document.getElementById('pred-wrap').style.display  = 'block';
+  document.getElementById('preview-img').src           = data.preview;
+  document.getElementById('digit-big').textContent    = data.digito;
+
+  const bars = document.getElementById('conf-bars');
+  bars.innerHTML = '';
+  const maxA = Math.max(...data.activaciones);
+
+  data.activaciones.forEach((a, i) => {
+    const isTop = (i === data.digito);
+    const color = isTop ? '#6c63ff' : (a > 0.25 ? '#ff6584' : '#2e3150');
+    const fw    = isTop ? '700' : '400';
+    const fc    = isTop ? '#6c63ff' : '#6a6a8a';
+    bars.innerHTML += `
+      <div class="conf-row">
+        <span style="font-weight:${fw};color:${fc};">${i}</span>
+        <div class="conf-track">
+          <div class="conf-fill" style="width:${(a*100).toFixed(1)}%;background:${color};"></div>
+        </div>
+        <span style="color:var(--muted);">${(a*100).toFixed(1)}%</span>
+      </div>`;
+  });
+}
+
+function startAutoPredict() {
+  if (autoActive) {
+    clearInterval(autoTimer);
+    autoActive = false;
+    document.getElementById('btn-auto').textContent = '🔄 Auto';
+    document.getElementById('btn-auto').style.color = '';
+  } else {
+    if (!camStream) { alert('Activa la cámara primero'); return; }
+    autoActive = true;
+    document.getElementById('btn-auto').textContent = '⏹ Detener';
+    document.getElementById('btn-auto').style.color = 'var(--accent2)';
+    captureAndPredict();
+    autoTimer = setInterval(captureAndPredict, 1200);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── *
+ *  VISUALIZACIÓN DE LA RED  (Canvas puro)
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+// Throttle por vuelo: se dibuja tan pronto como llega la respuesta.
+// Si una época llega mientras el fetch está en vuelo, se marca "pendiente"
+// y se lanza otro fetch inmediatamente al terminar el actual.
+let _netFetching = false;
+let _netQueued   = false;
+
+function refreshNetwork() {
+  if (_netFetching) {
+    _netQueued = true;   // habrá un dibujo en cuanto termine el fetch actual
+    return;
+  }
+  _netFetching = true;
+  _netQueued   = false;
+  fetch('/api/network')
+    .then(r => r.json())
+    .then(d => {
+      _netFetching = false;
+      drawNetwork(d);
+      if (_netQueued) refreshNetwork();  // dibujar el estado más reciente
+    })
+    .catch(() => { _netFetching = false; });
+}
+
+function drawNetwork(d) {
+  const canvas = document.getElementById('net-canvas');
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W   = canvas.parentElement.clientWidth - 20;
+  if (W < 10) return;   // panel oculto o sin layout todavía
+  const H   = 460;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = '#141627';
+  ctx.fillRect(0, 0, W, H);
+
+  const N_IN  = d.input_act.length;
+  const N_HID = d.hidden_act.length;
+  const N_OUT = d.output_act.length;
+
+  const PAD_Y = 28;
+  const PAD_X = 60;
+
+  // Radio dinámico: se reduce si hay muchos nodos para evitar solapamiento
+  const maxN  = Math.max(N_IN, N_HID);
+  const R     = Math.max(4, Math.min(8, Math.floor((H - PAD_Y*2) / (maxN * 2.8))));
+
+  const xIN  = PAD_X;
+  const xHID = W / 2;
+  const xOUT = W - PAD_X - 24;   // -24 para dejar espacio a la etiqueta del dígito
+
+  const yOf = (i, total) =>
+    total === 1 ? H/2 : PAD_Y + (i/(total-1)) * (H - PAD_Y*2);
+
+  // Color de nodo según activación (gris oscuro → amarillo)
+  function nodeColor(a) {
+    a = Math.max(0, Math.min(1, a));
+    const r = Math.round(37  + a*(253-37));
+    const g = Math.round(40  + a*(200-40));
+    const b = Math.round(64  + a*(80-64));
+    return `rgb(${r},${g},${b})`;
+  }
+
+  const posIN  = Array.from({length:N_IN},  (_,i)=>[xIN,  yOf(i,N_IN)]);
+  const posHID = Array.from({length:N_HID}, (_,i)=>[xHID, yOf(i,N_HID)]);
+  const posOUT = Array.from({length:N_OUT}, (_,i)=>[xOUT, yOf(i,N_OUT)]);
+
+  // Normalizar pesos para alpha
+  const flatIH  = d.W_ih.flat();
+  const flatHO  = d.W_ho.flat();
+  const maxWih  = Math.max(...flatIH.map(Math.abs), 1e-6);
+  const maxWho  = Math.max(...flatHO.map(Math.abs), 1e-6);
+
+  ctx.lineWidth = 0.7;
+
+  // ── Conexiones IN → HID ────────────────────────────────────────────────────
+  for (let i=0; i<N_IN; i++) {
+    for (let j=0; j<N_HID; j++) {
+      const w = d.W_ih[i][j];
+      const a = (Math.abs(w)/maxWih) * 0.45 + 0.03;
+      ctx.strokeStyle = w>=0
+        ? `rgba(108,99,255,${a.toFixed(2)})`
+        : `rgba(255,101,132,${a.toFixed(2)})`;
+      ctx.beginPath();
+      ctx.moveTo(posIN[i][0]+R,  posIN[i][1]);
+      ctx.lineTo(posHID[j][0]-R, posHID[j][1]);
+      ctx.stroke();
+    }
+  }
+
+  // ── Conexiones HID → OUT ───────────────────────────────────────────────────
+  for (let j=0; j<N_HID; j++) {
+    for (let k=0; k<N_OUT; k++) {
+      const w = d.W_ho[j][k];
+      const a = (Math.abs(w)/maxWho) * 0.55 + 0.04;
+      ctx.strokeStyle = w>=0
+        ? `rgba(108,99,255,${a.toFixed(2)})`
+        : `rgba(255,101,132,${a.toFixed(2)})`;
+      ctx.beginPath();
+      ctx.moveTo(posHID[j][0]+R, posHID[j][1]);
+      ctx.lineTo(posOUT[k][0]-R, posOUT[k][1]);
+      ctx.stroke();
+    }
+  }
+
+  // ── Nodos INPUT ────────────────────────────────────────────────────────────
+  posIN.forEach(([x,y],i) => {
+    ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI*2);
+    ctx.fillStyle   = nodeColor(d.input_act[i]);
+    ctx.strokeStyle = '#6c63ff66'; ctx.lineWidth = 1;
+    ctx.fill(); ctx.stroke();
+  });
+
+  // ── Nodos HIDDEN ───────────────────────────────────────────────────────────
+  posHID.forEach(([x,y],i) => {
+    ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI*2);
+    ctx.fillStyle   = nodeColor(d.hidden_act[i]);
+    ctx.strokeStyle = '#43e97b66'; ctx.lineWidth = 1;
+    ctx.fill(); ctx.stroke();
+  });
+
+  // ── Nodos OUTPUT  (con etiqueta del dígito) ────────────────────────────────
+  const maxAct = Math.max(...d.output_act);
+  posOUT.forEach(([x,y],k) => {
+    const isMax = d.output_act[k] === maxAct && maxAct > 0.01;
+    const rr    = isMax ? R+3 : R;
+    ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI*2);
+    ctx.fillStyle   = nodeColor(d.output_act[k]);
+    ctx.strokeStyle = isMax ? '#ffd460' : '#ff658466';
+    ctx.lineWidth   = isMax ? 2.5 : 1;
+    ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = isMax ? '#ffd460' : '#6a6a8a';
+    ctx.font      = `${isMax ? 'bold ' : ''}11px sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.fillText(k + (isMax ? ' ◄' : ''), x+rr+5, y+4);
+  });
+
+  // ── Etiquetas de capa ──────────────────────────────────────────────────────
+  ctx.font      = '10px sans-serif';
+  ctx.fillStyle = '#6a6a8a';
+  ctx.textAlign = 'center';
+  ctx.fillText(`INPUT`,         xIN,  H-14);
+  ctx.fillText(`${N_IN}/784`,   xIN,  H-3);
+  ctx.fillText(`HIDDEN`,        xHID, H-14);
+  ctx.fillText(`${N_HID}/64`,   xHID, H-3);
+  ctx.fillText(`OUTPUT`,        xOUT, H-14);
+  ctx.fillText(`10 nodos`,      xOUT, H-3);
+
+  // ── Leyenda de colores de conexión ─────────────────────────────────────────
+  const lx = W - 140, ly = 10;
+  ctx.font = '9px sans-serif'; ctx.textAlign = 'left';
+  ctx.strokeStyle = 'rgba(108,99,255,.7)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(lx,ly+4); ctx.lineTo(lx+18,ly+4); ctx.stroke();
+  ctx.fillStyle = '#6a6a8a'; ctx.fillText('Peso positivo', lx+22, ly+7);
+  ctx.strokeStyle = 'rgba(255,101,132,.7)';
+  ctx.beginPath(); ctx.moveTo(lx,ly+16); ctx.lineTo(lx+18,ly+16); ctx.stroke();
+  ctx.fillText('Peso negativo', lx+22, ly+19);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── *
+ *  DEBUG — PRIMERA ITERACIÓN DÍGITO 7
+ * ─────────────────────────────────────────────────────────────────────────── */
+let debugData     = null;
+let showAllInputs = false;
+
+function loadDebug7() {
+  ['trace-hidden-tbody','trace-output-tbody','debug-input-tbody'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<tr><td colspan="8" class="trace-placeholder">Calculando…</td></tr>';
+  });
+  fetch('/api/debug7')
+    .then(r => r.json())
+    .then(d => { if (d.error) { console.error(d.error); return; } debugData = d; renderDebug(d); })
+    .catch(e => console.warn('debug7:', e));
+}
+
+function renderDebug(d) {
+  const eta = d.tasa;
+  document.getElementById('tr-digit').textContent          = d.digito;
+  document.getElementById('tr-loss').textContent           = d.loss.toFixed(8);
+  document.getElementById('tr-loss-val').textContent       = d.loss.toFixed(8);
+  document.getElementById('tr-eta').textContent            = eta;
+  document.getElementById('tr-eta2').textContent           = eta;
+  if (d.semilla !== undefined) document.getElementById('tr-semilla').textContent = d.semilla;
+  const maxOut = Math.max(...d.output.map(n => n.sigma_z));
+  document.getElementById('tr-max-out').textContent        = (maxOut*100).toFixed(2)+'%';
+  document.getElementById('tr-hidden-active').textContent  =
+    d.hidden.filter(n => n.sigma_z > 0.5).length + ' / 64';
+  renderInputCanvas(d.inputs);
+  renderInputTable(d.inputs);
+  renderHiddenTable(d);
+  renderOutputTable(d);
+}
+
+function renderInputCanvas(inputs) {
+  const canvas = document.getElementById('trace-input-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.height = 280;
+  for (let r = 0; r < 28; r++) for (let c = 0; c < 28; c++) {
+    const g = Math.round(inputs[r*28+c]*255);
+    ctx.fillStyle = `rgb(${g},${g},${g})`;
+    ctx.fillRect(c*10, r*10, 10, 10);
+  }
+  canvas.onmousemove = e => {
+    const rect = canvas.getBoundingClientRect();
+    const c = Math.floor((e.clientX-rect.left)/rect.width*28);
+    const r = Math.floor((e.clientY-rect.top)/rect.height*28);
+    if (c>=0&&c<28&&r>=0&&r<28) {
+      const i = r*28+c;
+      document.getElementById('trace-pixel-info').textContent =
+        `Píxel [${i}]  fila=${r}  col=${c}  x_i=${inputs[i].toFixed(6)}`;
+    }
+  };
+  canvas.onmouseleave = () =>
+    document.getElementById('trace-pixel-info').textContent = 'Pasa el mouse para ver el valor del píxel';
+}
+
+function renderInputTable(inputs) {
+  const tbody = document.getElementById('debug-input-tbody');
+  tbody.innerHTML = '';
+  let count = 0;
+  inputs.forEach((v, i) => {
+    if (!showAllInputs && v === 0) return;
+    const clr = v > 0.5 ? 'var(--accent)' : (v > 0 ? 'var(--text)' : 'var(--muted)');
+    tbody.innerHTML += `<tr>
+      <td style="color:var(--muted);">${i}</td>
+      <td>${Math.floor(i/28)}</td><td>${i%28}</td>
+      <td style="color:${clr};font-weight:${v>0.3?'600':'400'}">${v.toFixed(6)}</td>
+    </tr>`;
+    count++;
+  });
+  if (!count) tbody.innerHTML = '<tr><td colspan="4" class="trace-placeholder">Todos los píxeles son 0</td></tr>';
+}
+
+function toggleInputTable() {
+  showAllInputs = !showAllInputs;
+  document.getElementById('btn-toggle-inputs').textContent = showAllInputs ? 'Solo activos' : 'Todos (784)';
+  if (debugData) renderInputTable(debugData.inputs);
+}
+
+function renderHiddenTable(d) {
+  const tbody = document.getElementById('trace-hidden-tbody');
+  tbody.innerHTML = '';
+  d.hidden.forEach(n => {
+    const sigp = (n.sigma_z*(1-n.sigma_z)).toFixed(6);
+    const clr  = n.sigma_z > 0.5 ? 'var(--accent)' : 'var(--muted)';
+    const eClr = Math.abs(n.error) > 0.01 ? 'var(--accent2)' : 'var(--muted)';
+    tbody.innerHTML += `<tr>
+      <td style="color:var(--muted);">${n.j}</td>
+      <td>${n.z.toFixed(6)}</td>
+      <td style="color:${clr};">${n.sigma_z.toFixed(6)}</td>
+      <td>${sigp}</td>
+      <td style="color:${eClr};">${n.error.toFixed(6)}</td>
+      <td><button class="btn btn-secondary btn-sm" style="padding:2px 7px;font-size:.65rem;"
+            onclick="openModal('hidden',${n.j})">&#128269;</button></td>
+    </tr>`;
+  });
+}
+
+function renderOutputTable(d) {
+  const tbody = document.getElementById('trace-output-tbody');
+  tbody.innerHTML = '';
+  d.output.forEach(n => {
+    const isWin = (n.k === d.digito);
+    const sigp  = (n.sigma_z*(1-n.sigma_z)).toFixed(6);
+    const h2    = (0.5*n.error*n.error).toFixed(8);
+    const eClr  = isWin ? (n.error>=0 ? 'var(--green)' : 'var(--accent2)') : 'var(--muted)';
+    tbody.innerHTML += `<tr class="${isWin?'tr-winner':''}">
+      <td>${n.k}${isWin?' ◄':''}</td>
+      <td>${n.z.toFixed(6)}</td>
+      <td>${n.sigma_z.toFixed(6)}</td>
+      <td>${sigp}</td>
+      <td style="color:${n.esperado===1?'var(--green)':'var(--muted)'}">${n.esperado}</td>
+      <td style="color:${eClr};">${n.error.toFixed(6)}</td>
+      <td>${h2}</td>
+      <td><button class="btn btn-secondary btn-sm" style="padding:2px 7px;font-size:.65rem;"
+            onclick="openModal('output',${n.k})">&#128269;</button></td>
+    </tr>`;
+  });
+}
+
+/* ── Modal ─────────────────────────────────────────────────────────────────── */
+function openModal(type, idx) {
+  if (!debugData) return;
+  const eta = debugData.tasa;
+
+  if (type === 'hidden') {
+    const n    = debugData.hidden[idx];
+    const inp  = debugData.inputs;
+    const sigp = n.sigma_z * (1 - n.sigma_z);
+
+    const contribs = n.pesos_in.map((w,i) => ({i, x:inp[i], w, c:inp[i]*w}))
+                       .sort((a,b) => Math.abs(b.c)-Math.abs(a.c));
+
+    let html = `<div class="modal-summary">
+      <div class="ts-item"><span class="ts-label">z = Σ(x·w)</span><span class="ts-val">${n.z.toFixed(6)}</span></div>
+      <div class="ts-item"><span class="ts-label">σ(z)</span><span class="ts-val" style="color:var(--green)">${n.sigma_z.toFixed(6)}</span></div>
+      <div class="ts-item"><span class="ts-label">σ'(z) = σ(1-σ)</span><span class="ts-val" style="color:var(--accent)">${sigp.toFixed(6)}</span></div>
+      <div class="ts-item"><span class="ts-label">error backprop</span><span class="ts-val" style="color:var(--accent2)">${n.error.toFixed(6)}</span></div>
+    </div>
+    <span class="modal-section-title">Entradas — 784 pesos ordenados por |contribución a z| &nbsp;
+      <small style="text-transform:none;font-weight:400;">ΔW_ij = η × e_j × σ'(z_j) × x_i</small>
+    </span>
+    <div style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">
+    <table class="trace-table"><thead><tr>
+      <th>i</th><th>fila</th><th>col</th><th>x_i</th><th>w_ij</th><th>x_i×w_ij</th><th>ΔW_ij</th><th>w_ij nuevo</th>
+    </tr></thead><tbody>`;
+
+    contribs.forEach(c => {
+      const dw  = eta * n.error * sigp * c.x;
+      const cc  = c.c >= 0 ? 'rgba(108,99,255,.85)' : 'rgba(255,101,132,.85)';
+      const dwc = dw >= 0  ? 'var(--green)' : 'var(--accent2)';
+      html += `<tr>
+        <td style="color:var(--muted)">${c.i}</td><td>${Math.floor(c.i/28)}</td><td>${c.i%28}</td>
+        <td>${c.x.toFixed(6)}</td><td>${c.w.toFixed(8)}</td>
+        <td style="color:${cc};font-weight:600">${c.c.toFixed(8)}</td>
+        <td style="color:${dwc};font-weight:600">${dw.toFixed(8)}</td>
+        <td style="color:var(--muted)">${(c.w+dw).toFixed(8)}</td>
+      </tr>`;
+    });
+
+    html += `</tbody></table></div>
+    <span class="modal-section-title">Salidas → Capa Output &nbsp;
+      <small style="text-transform:none;font-weight:400;">ΔW_jk = η × e_k × σ'(z_k) × σ(z_j)</small>
+    </span>
+    <table class="trace-table"><thead><tr>
+      <th>k (dígito)</th><th>w_jk actual</th><th>σ(z_j)</th><th>ΔW_jk</th><th>w_jk nuevo</th>
+    </tr></thead><tbody>`;
+
+    n.delta_w_out.forEach((dw, k) => {
+      const wjk = debugData.output[k].pesos_in[idx];
+      const isT = k===7;
+      const dwc = dw>=0 ? 'var(--green)' : 'var(--accent2)';
+      html += `<tr class="${isT?'tr-winner':''}">
+        <td>${k}${isT?' ◄':''}</td><td>${wjk.toFixed(8)}</td>
+        <td>${n.sigma_z.toFixed(6)}</td>
+        <td style="color:${dwc};font-weight:600">${dw.toFixed(8)}</td>
+        <td style="color:var(--muted)">${(wjk+dw).toFixed(8)}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+
+    document.getElementById('modal-title').textContent = `Nodo Hidden  j = ${idx}`;
+    document.getElementById('modal-content').innerHTML = html;
+
+  } else if (type === 'output') {
+    const n    = debugData.output[idx];
+    const hid  = debugData.hidden;
+    const sigp = n.sigma_z * (1 - n.sigma_z);
+    const h2   = 0.5 * n.error * n.error;
+
+    let html = `<div class="modal-summary">
+      <div class="ts-item"><span class="ts-label">z = Σ(h·w)</span><span class="ts-val">${n.z.toFixed(6)}</span></div>
+      <div class="ts-item"><span class="ts-label">σ(z)</span><span class="ts-val" style="color:${n.esperado===1?'var(--green)':'var(--text)'}">${n.sigma_z.toFixed(6)}</span></div>
+      <div class="ts-item"><span class="ts-label">esperado</span><span class="ts-val" style="color:${n.esperado===1?'var(--green)':'var(--muted)'}">${n.esperado}</span></div>
+      <div class="ts-item"><span class="ts-label">error = esp−σ(z)</span><span class="ts-val" style="color:${n.error>=0?'var(--green)':'var(--accent2)'}">${n.error.toFixed(6)}</span></div>
+      <div class="ts-item"><span class="ts-label">σ'(z)</span><span class="ts-val">${sigp.toFixed(6)}</span></div>
+      <div class="ts-item"><span class="ts-label">½e²</span><span class="ts-val" style="color:var(--yellow)">${h2.toFixed(8)}</span></div>
+    </div>
+    <span class="modal-section-title">Entradas desde Hidden — 64 conexiones &nbsp;
+      <small style="text-transform:none;font-weight:400;">ΔW_jk = η × e_k × σ'(z_k) × σ(z_j)</small>
+    </span>
+    <div style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">
+    <table class="trace-table"><thead><tr>
+      <th>j</th><th>σ(z_j)</th><th>w_jk actual</th><th>σ(z_j)×w_jk</th><th>ΔW_jk</th><th>w_jk nuevo</th>
+    </tr></thead><tbody>`;
+
+    n.pesos_in.forEach((w, j) => {
+      const hj   = hid[j].sigma_z;
+      const cont = hj * w;
+      const dw   = n.delta_w_in[j];
+      const cc   = cont >= 0 ? 'rgba(108,99,255,.8)' : 'rgba(255,101,132,.8)';
+      const dwc  = dw  >= 0 ? 'var(--green)' : 'var(--accent2)';
+      html += `<tr>
+        <td style="color:var(--muted)">${j}</td><td>${hj.toFixed(6)}</td>
+        <td>${w.toFixed(8)}</td>
+        <td style="color:${cc}">${cont.toFixed(8)}</td>
+        <td style="color:${dwc};font-weight:600">${dw.toFixed(8)}</td>
+        <td style="color:var(--muted)">${(w+dw).toFixed(8)}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+
+    document.getElementById('modal-title').textContent = `Nodo Output  k = ${idx}  —  Dígito "${idx}"`;
+    document.getElementById('modal-content').innerHTML = html;
+  }
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+function closeModalOutside(e) {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── *
+ *  MODO EDUCATIVO — PASO A PASO
+ * ─────────────────────────────────────────────────────────────────────────── */
+let eduData  = null;
+let eduStep  = 0;
+let eduDigit = -1;  // -1 = aleatorio
+
+const EDU_STEPS = [
+  { label: 'Entrada',      icon: '📥' },
+  { label: 'Forward→H',   icon: '➡' },
+  { label: 'Forward→O',   icon: '➡' },
+  { label: 'Error',       icon: '⚠' },
+  { label: 'Backprop→O',  icon: '⬅' },
+  { label: 'Backprop→H',  icon: '⬅' },
+  { label: 'ΔW / Update', icon: '🔄' },
+];
+
+function setTrainMode(mode) {
+  const speed = mode === 'speed';
+  document.getElementById('speed-content').style.display = speed ? '' : 'none';
+  document.getElementById('edu-content').style.display   = speed ? 'none' : '';
+  document.getElementById('btn-mode-speed').classList.toggle('active',  speed);
+  document.getElementById('btn-mode-edu').classList.toggle('active', !speed);
+  // La red solo se muestra en modo Educativo
+  document.getElementById('panel-network').style.display = speed ? 'none' : '';
+  if (speed) document.getElementById('panel-edu-steps').style.display = 'none';
+  else if (eduData) document.getElementById('panel-edu-steps').style.display = '';
+}
+
+function setEduDigit(d) {
+  eduDigit = d;
+  document.querySelectorAll('.digit-sel-btn').forEach(b => b.classList.remove('active'));
+  const id = d === -1 ? 'edu-d-rnd' : `edu-d-${d}`;
+  document.getElementById(id).classList.add('active');
+}
+
+function loadEduSample() {
+  const url = eduDigit >= 0 ? `/api/edu/sample?digito=${eduDigit}` : '/api/edu/sample';
+  document.getElementById('edu-status').textContent = 'Cargando muestra de MNIST…';
+  const btn = document.getElementById('btn-edu-load');
+  btn.disabled = true;
+
+  fetch(url).then(r => r.json()).then(d => {
+    btn.disabled = false;
+    if (d.error) { document.getElementById('edu-status').textContent = '✗ ' + d.error; return; }
+    eduData = d;
+    eduStep = 0;
+    document.getElementById('edu-status').textContent  = `✓ Muestra cargada — Dígito real: ${d.label}`;
+    document.getElementById('panel-edu-steps').style.display = '';
+    document.getElementById('edu-hdr-label').textContent     = `Dígito ${d.label}`;
+    document.getElementById('edu-loss-badge').textContent    = `Loss: ${d.loss.toFixed(6)}`;
+    renderEduStepper();
+    renderEduStep();
+    refreshNetwork();   // refrescar canvas con activaciones de esta muestra
+  }).catch(e => {
+    btn.disabled = false;
+    document.getElementById('edu-status').textContent = '✗ ' + e.message;
+  });
+}
+
+function renderEduStepper() {
+  const el = document.getElementById('edu-stepper');
+  el.innerHTML = '';
+  EDU_STEPS.forEach((s, i) => {
+    const cls = i === eduStep ? 'active' : (i < eduStep ? 'done' : '');
+    el.innerHTML += `
+      <div class="edu-step-item">
+        <button class="edu-step-btn ${cls}" onclick="goEduStep(${i})">
+          <div class="edu-step-dot">${i < eduStep ? '✓' : (i+1)}</div>
+          <span>${s.icon} ${s.label}</span>
+        </button>
+        ${i < EDU_STEPS.length-1 ? `<div class="edu-step-line ${i < eduStep ? 'done' : ''}"></div>` : ''}
+      </div>`;
+  });
+}
+
+function goEduStep(i) {
+  if (!eduData) return;
+  eduStep = i;
+  renderEduStepper();
+  renderEduStep();
+}
+
+function eduPrev() { if (eduStep > 0) { eduStep--; renderEduStepper(); renderEduStep(); } }
+function eduNext() { if (eduStep < EDU_STEPS.length-1) { eduStep++; renderEduStepper(); renderEduStep(); } }
+
+function renderEduStep() {
+  const n = EDU_STEPS.length;
+  document.getElementById('btn-edu-prev').disabled  = (eduStep === 0);
+  document.getElementById('btn-edu-next').disabled  = (eduStep === n-1);
+  const applyBtn = document.getElementById('btn-edu-apply');
+  const isLast   = eduStep === n-1;
+  applyBtn.disabled = !isLast;
+  applyBtn.style.opacity = isLast ? '1' : '.45';
+  document.getElementById('edu-step-label').textContent =
+    `Paso ${eduStep+1} de ${n} — ${EDU_STEPS[eduStep].icon} ${EDU_STEPS[eduStep].label}`;
+
+  const d = eduData;
+  const renders = [
+    () => renderEduStep1(d), () => renderEduStep2(d), () => renderEduStep3(d),
+    () => renderEduStep4(d), () => renderEduStep5(d), () => renderEduStep6(d),
+    () => renderEduStep7(d),
+  ];
+  document.getElementById('edu-step-area').innerHTML = renders[eduStep]();
+  if (eduStep === 0) drawEduPixelCanvas(d.inputs);
+}
+
+function drawEduPixelCanvas(inputs) {
+  const c = document.getElementById('edu-pixel-canvas');
+  if (!c) return;
+  c.width = c.height = 168;
+  const ctx = c.getContext('2d');
+  for (let r=0; r<28; r++) for (let cc=0; cc<28; cc++) {
+    const g = Math.round(inputs[r*28+cc]*255);
+    ctx.fillStyle = `rgb(${g},${g},${g})`;
+    ctx.fillRect(cc*6, r*6, 6, 6);
+  }
+}
+
+/* ── Paso 1: Entrada ─────────────────────────────────────────────────────── */
+function renderEduStep1(d) {
+  const active = d.inputs.filter(v => v > 0).length;
+  const maxPix = Math.max(...d.inputs).toFixed(4);
+  return `<div class="edu-step-panel">
+    <div class="edu-explanation">
+      <strong>¿Qué hace la red en este paso?</strong><br>
+      La imagen del dígito mide 28×28 píxeles = <strong>784 píxeles en total</strong>.
+      Cada píxel se convierte en un número entre 0 y 1
+      (0 = negro, 1 = blanco). Esos 784 números forman el
+      <em>vector de entrada</em> que alimenta la red neuronal.<br>
+      <span style="color:var(--muted);font-size:.8rem;">Ningún cálculo ocurre todavía — solo se preparan los datos.</span>
+      <br><span class="edu-formula">x = [x₀, x₁, …, x₇₈₃] ∈ ℝ⁷⁸⁴ · xᵢ ∈ [0, 1]</span>
+    </div>
+    <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:.7rem;color:var(--muted);margin-bottom:6px;">IMAGEN 28×28 (ampliada 6×)</div>
+        <canvas id="edu-pixel-canvas" width="168" height="168"
+          style="display:block;image-rendering:pixelated;border:1px solid var(--border);border-radius:6px;"></canvas>
+      </div>
+      <div class="edu-summary">
+        <div class="edu-sum-item">
+          <span class="edu-sum-label">Dígito real (etiqueta y)</span>
+          <span class="edu-sum-val" style="font-size:2.5rem;color:var(--accent);line-height:1">${d.label}</span>
+        </div>
+        <div class="edu-sum-item"><span class="edu-sum-label">Total entradas (x)</span><span class="edu-sum-val">784</span></div>
+        <div class="edu-sum-item"><span class="edu-sum-label">Píxeles con luz (xᵢ > 0)</span><span class="edu-sum-val" style="color:var(--green)">${active}</span></div>
+        <div class="edu-sum-item"><span class="edu-sum-label">Píxeles apagados (xᵢ = 0)</span><span class="edu-sum-val" style="color:var(--muted)">${784-active}</span></div>
+        <div class="edu-sum-item"><span class="edu-sum-label">Valor máximo detectado</span><span class="edu-sum-val">${maxPix}</span></div>
+        <div class="edu-sum-item"><span class="edu-sum-label">Tasa aprendizaje η</span><span class="edu-sum-val" style="color:var(--yellow)">${d.tasa}</span></div>
+      </div>
+    </div>
+    <div style="margin-top:10px;padding:8px 14px;background:rgba(108,99,255,.08);border-radius:6px;font-size:.78rem;color:var(--muted);">
+      💡 <strong>Clave:</strong> Los píxeles apagados (xᵢ = 0) no aportan nada al cálculo —
+      los pesos conectados a ellos se multiplican por cero y su contribución es nula.
+      Solo los ${active} píxeles activos "hablan" a la red.
+    </div>
+  </div>`;
+}
+
+/* ── Paso 2: Forward → Capa Hidden ──────────────────────────────────────── */
+function renderEduStep2(d) {
+  const sorted  = [...d.hidden].sort((a,b) => b.sigma_z - a.sigma_z);
+  const activos = d.hidden.filter(n => n.sigma_z > 0.5).length;
+  const dormidos = d.hidden.filter(n => n.sigma_z < 0.1).length;
+  const rows = sorted.slice(0,15).map(n => {
+    const clr = n.sigma_z > 0.5 ? 'var(--accent)' : (n.sigma_z > 0.3 ? 'var(--text)' : 'var(--muted)');
+    const estado = n.sigma_z > 0.5 ? '🟢 activo' : (n.sigma_z < 0.1 ? '⚫ dormido' : '🟡 medio');
+    return `<tr>
+      <td style="color:var(--muted)">${n.j}</td>
+      <td>${n.z.toFixed(4)}</td>
+      <td style="color:${clr};font-weight:${n.sigma_z>0.5?'600':'400'}">${n.sigma_z.toFixed(4)}</td>
+      <td style="color:var(--muted)">${n.sigma_prime.toFixed(4)}</td>
+      <td style="font-size:.7rem">${estado}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="edu-step-panel">
+    <div class="edu-explanation">
+      <strong>¿Qué hace la red en este paso?</strong><br>
+      Cada una de las <strong>64 neuronas ocultas</strong> recibe los 784 píxeles,
+      los multiplica por sus pesos y los suma → eso da z_j.<br>
+      Luego aplica la función <strong>sigmoide</strong>, que "aplana" el resultado a un valor
+      entre 0 y 1: si z_j es muy positivo → σ ≈ 1 (neurona activa);
+      si es muy negativo → σ ≈ 0 (neurona dormida).
+      <br><span class="edu-formula">z_j = Σᵢ xᵢ·wᵢⱼ · σ(z_j) = 1/(1+e⁻ᶻʲ) · Total: 784×64 = 50 176 operaciones</span>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:220px;">
+        <div style="font-size:.7rem;color:var(--muted);margin-bottom:6px;">TOP 15 más activadas de 64 neuronas ocultas</div>
+        <div class="trace-table-wrap" style="max-height:260px;">
+          <table class="trace-table">
+            <thead><tr><th>j</th><th>z_j (suma)</th><th>σ(z_j)</th><th>σ'(z_j)</th><th>estado</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>
+      <div class="edu-summary" style="flex-direction:column;align-self:flex-start;">
+        <div class="edu-sum-item"><span class="edu-sum-label">🟢 Activas (σ > 0.5)</span><span class="edu-sum-val" style="color:var(--green)">${activos} / 64</span></div>
+        <div class="edu-sum-item"><span class="edu-sum-label">⚫ Dormidas (σ < 0.1)</span><span class="edu-sum-val" style="color:var(--muted)">${dormidos} / 64</span></div>
+        <div class="edu-sum-item"><span class="edu-sum-label">Conexiones I→H</span><span class="edu-sum-val">50 176</span></div>
+      </div>
+    </div>
+    <div style="margin-top:10px;padding:8px 14px;background:rgba(108,99,255,.08);border-radius:6px;font-size:.78rem;color:var(--muted);">
+      💡 <strong>Intuición:</strong> Las neuronas ocultas aprenden a detectar rasgos visuales del dígito
+      (bordes, curvas, ángulos). Una neurona activa (σ≈1) encontró ese rasgo en la imagen.
+    </div>
+  </div>`;
+}
+
+/* ── Paso 3: Forward → Capa Output ──────────────────────────────────────── */
+function renderEduStep3(d) {
+  const predIdx = d.output.reduce((b,n) => n.sigma_z > d.output[b].sigma_z ? n.k : b, 0);
+  const correct = predIdx === d.label;
+  const rows = d.output.map(n => {
+    const isPred = n.k === predIdx;
+    return `<tr class="${isPred ? 'tr-winner' : ''}">
+      <td><strong style="color:${isPred?'var(--yellow)':'inherit'}">${n.k}${isPred ? ' ◄ PREDICCIÓN' : ''}</strong></td>
+      <td>${n.z.toFixed(4)}</td>
+      <td style="color:${isPred?'var(--yellow)':'var(--muted)'};font-weight:${isPred?'700':'400'}">${n.sigma_z.toFixed(4)}</td>
+      <td style="color:var(--muted)">${n.sigma_prime.toFixed(4)}</td>
+      <td style="color:${n.esperado===1?'var(--green)':'var(--muted)'}">${n.esperado === 1 ? '✓ 1 (correcto)' : '0'}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="edu-step-panel">
+    <div class="edu-explanation">
+      <strong>¿Qué hace la red en este paso?</strong><br>
+      Las <strong>10 neuronas de salida</strong> (una por cada dígito 0–9) hacen lo mismo que la capa oculta:
+      reciben las 64 activaciones, las multiplican por sus pesos y suman → z_k.
+      La neurona con el valor σ(z_k) más alto gana: esa es la <strong>predicción ŷ</strong>.
+      <br><span class="edu-formula">z_k = Σⱼ h_j·w_jk · ŷ = argmaxₖ σ(z_k) · 64×10 = 640 operaciones</span>
+    </div>
+    <div style="margin-bottom:10px;padding:10px 14px;background:var(--surface2);border-radius:8px;display:flex;gap:24px;align-items:center;flex-wrap:wrap;">
+      <span>Predicción de la red: <strong style="color:var(--yellow);font-size:1.6rem;">${predIdx}</strong></span>
+      <span>Dígito real: <strong style="color:var(--accent);font-size:1.3rem;">${d.label}</strong></span>
+      <span style="color:${correct?'var(--green)':'var(--accent2)'};font-size:1rem;font-weight:700;">${correct ? '✓ ¡Acierto!' : '✗ Error — habrá corrección'}</span>
+    </div>
+    <div class="trace-table-wrap">
+      <table class="trace-table">
+        <thead><tr><th>k (dígito)</th><th>z_k (suma ponderada)</th><th>σ(z_k) confianza</th><th>σ'(z_k)</th><th>y_k esperado</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;padding:8px 14px;background:rgba(108,99,255,.08);border-radius:6px;font-size:.78rem;color:var(--muted);">
+      💡 <strong>Intuición:</strong> La red "vota" por cada dígito. La neurona con mayor confianza
+      (σ más alta) determina la respuesta. Si está ${correct ? 'en lo correcto' : 'equivocada'},
+      el siguiente paso calculará cuánto debe corregirse.
+    </div>
+  </div>`;
+}
+
+/* ── Paso 4: Cálculo de Error ────────────────────────────────────────────── */
+function renderEduStep4(d) {
+  const rows = d.output.map(n => {
+    const isT = n.esperado === 1;
+    const errClr = Math.abs(n.error) > 0.2 ? 'var(--accent2)' : (Math.abs(n.error) > 0.05 ? 'var(--yellow)' : 'var(--muted)');
+    return `<tr class="${isT ? 'tr-winner' : ''}">
+      <td><strong>${n.k}${isT ? ' ← objetivo' : ''}</strong></td>
+      <td style="color:${isT?'var(--green)':'var(--muted)'}">${n.esperado === 1 ? '1 (quería este)' : '0'}</td>
+      <td>${n.sigma_z.toFixed(4)}</td>
+      <td style="color:${errClr};font-weight:${Math.abs(n.error)>0.1?'600':'400'}">${n.error.toFixed(4)}</td>
+      <td style="color:var(--yellow)">${n.half_e2.toFixed(6)}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="edu-step-panel">
+    <div class="edu-explanation">
+      <strong>¿Qué hace la red en este paso?</strong><br>
+      Comparamos lo que predijo la red con lo que era la respuesta correcta.
+      Para el dígito real (${d.label}), el valor esperado es <strong>1</strong>;
+      para todos los demás dígitos el valor esperado es <strong>0</strong>.<br>
+      <em>e_k = (esperado) − (predicho)</em>: si la red acertó, el error es pequeño;
+      si falló, el error es grande. Luego se calcula la <strong>pérdida total L</strong>.
+      <br><span class="edu-formula">eₖ = yₖ − σ(zₖ) · L = ½Σₖ eₖ² = ${d.loss.toFixed(6)}</span>
+    </div>
+    <div class="trace-table-wrap">
+      <table class="trace-table">
+        <thead><tr><th>k (dígito)</th><th>y_k esperado</th><th>σ(z_k) predicho</th><th>e_k = y−σ</th><th>½·e_k² (contrib. al error)</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="trace-loss-box" style="margin-top:10px;">
+      📉 Pérdida total L = ½Σe_k² = <strong>${d.loss.toFixed(8)}</strong>
+      &nbsp;— cuanto menor, mejor.
+    </div>
+    <div style="margin-top:8px;padding:8px 14px;background:rgba(108,99,255,.08);border-radius:6px;font-size:.78rem;color:var(--muted);">
+      💡 <strong>Intuición:</strong> El error es la diferencia entre lo que la red dijo y lo que
+      debía decir. Los pasos 5–7 usarán este error para corregir todos los pesos.
+    </div>
+  </div>`;
+}
+
+/* ── Paso 5: Backprop en capa Output ────────────────────────────────────── */
+function renderEduStep5(d) {
+  const rows = d.output.map(n => {
+    const delta = (n.error * n.sigma_prime).toFixed(5);
+    const errClr = Math.abs(n.error) > 0.1 ? 'var(--accent2)' : 'var(--muted)';
+    return `<tr>
+      <td>${n.k}</td>
+      <td style="color:${errClr}">${n.error.toFixed(5)}</td>
+      <td>${n.sigma_z.toFixed(5)}</td>
+      <td>${n.sigma_prime.toFixed(5)}</td>
+      <td style="color:var(--accent);font-weight:600">${delta}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="edu-step-panel">
+    <div class="edu-explanation">
+      <strong>¿Qué hace la red en este paso?</strong><br>
+      Ahora el error "viaja al revés" — desde la salida hacia la capa oculta.
+      Para cada neurona de salida calculamos <strong>δ_k = e_k × σ'(z_k)</strong>,
+      que mide <em>cuánto</em> y <em>en qué dirección</em> debe cambiar cada peso H→O.<br>
+      σ'(z_k) = σ(z_k)×(1−σ(z_k)) es la <em>sensibilidad</em> de la sigmoide
+      (máxima cuando σ ≈ 0.5, casi cero cuando σ está cerca de 0 ó 1).
+      <br><span class="edu-formula">δₖ = eₖ × σ'(zₖ) = eₖ × σ(zₖ)×(1−σ(zₖ)) ← "cuánto y hacia dónde" corregir</span>
+    </div>
+    <div class="trace-table-wrap">
+      <table class="trace-table">
+        <thead><tr><th>k (dígito)</th><th>e_k (error)</th><th>σ(z_k)</th><th>σ'(z_k) sensibilidad</th><th>δ_k = e·σ' (gradiente)</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;padding:8px 14px;background:rgba(108,99,255,.08);border-radius:6px;font-size:.78rem;color:var(--muted);">
+      💡 <strong>Luego:</strong> Cada error δ_k se <em>distribuye hacia atrás</em> a las 64 neuronas ocultas
+      de forma proporcional al peso de cada conexión:
+      <code style="color:var(--accent)">e_j = Σ_k δ_k × (w_jk / Σ_k|w_jk|)</code>
+    </div>
+  </div>`;
+}
+
+/* ── Paso 6: Backprop en capa Hidden ────────────────────────────────────── */
+function renderEduStep6(d) {
+  const sorted = [...d.hidden].sort((a,b) => Math.abs(b.error) - Math.abs(a.error));
+  const conError = d.hidden.filter(n => Math.abs(n.error) > 0.001).length;
+  const rows = sorted.slice(0, 15).map(n => {
+    const delta = (n.error * n.sigma_prime).toFixed(6);
+    const eClr  = Math.abs(n.error) > 0.02 ? 'var(--accent2)' : (Math.abs(n.error) > 0.005 ? 'var(--yellow)' : 'var(--muted)');
+    return `<tr>
+      <td style="color:var(--muted)">${n.j}</td>
+      <td>${n.sigma_z.toFixed(4)}</td>
+      <td style="color:${eClr};font-weight:${Math.abs(n.error)>0.01?'600':'400'}">${n.error.toFixed(5)}</td>
+      <td>${n.sigma_prime.toFixed(4)}</td>
+      <td style="color:var(--accent)">${delta}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="edu-step-panel">
+    <div class="edu-explanation">
+      <strong>¿Qué hace la red en este paso?</strong><br>
+      El error llega ahora a las <strong>64 neuronas ocultas</strong>. Cada una recibe
+      una parte del error de la capa de salida, proporcional al peso de sus conexiones.<br>
+      Con ese error acumulado (e_j) calculamos <strong>δ_j = e_j × σ'(z_j)</strong>,
+      que indica cuánto deben cambiar los pesos I→H (los más numerosos: 784×64 = <strong>50 176 pesos</strong>).
+      <br><span class="edu-formula">eⱼ = Σₖ δₖ·(wⱼₖ/Σₖ|wⱼₖ|) · δⱼ = eⱼ×σ'(zⱼ) ← gradiente para actualizar I→H</span>
+    </div>
+    <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+      <div style="flex:1;min-width:240px;">
+        <div style="font-size:.7rem;color:var(--muted);margin-bottom:6px;">TOP 15 por |error| de 64 neuronas ocultas</div>
+        <div class="trace-table-wrap" style="max-height:260px;">
+          <table class="trace-table">
+            <thead><tr><th>j</th><th>σ(z_j)</th><th>e_j (recibido)</th><th>σ'(z_j)</th><th>δ_j = e·σ'</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>
+      <div class="edu-summary" style="flex-direction:column;align-self:flex-start;">
+        <div class="edu-sum-item"><span class="edu-sum-label">Neuronas con error</span><span class="edu-sum-val" style="color:var(--accent2)">${conError} / 64</span></div>
+        <div class="edu-sum-item"><span class="edu-sum-label">Pesos I→H a ajustar</span><span class="edu-sum-val">50 176</span></div>
+      </div>
+    </div>
+    <div style="margin-top:10px;padding:8px 14px;background:rgba(108,99,255,.08);border-radius:6px;font-size:.78rem;color:var(--muted);">
+      💡 <strong>Intuición:</strong> Las neuronas que más contribuyeron al error recibirán
+      las correcciones más grandes. Las que estaban dormidas (σ≈0 ó σ≈1) reciben
+      gradiente casi nulo (σ' ≈ 0) — el problema llamado <em>"gradiente que desaparece"</em>.
+    </div>
+  </div>`;
+}
+
+/* ── Paso 7: ΔW y Actualización de Pesos ───────────────────────────────── */
+function renderEduStep7(d) {
+  const eta = d.tasa;
+
+  // Top 12 ΔW en H→O
+  const ho = [];
+  d.hidden.forEach(h => d.output.forEach(o => {
+    ho.push({ j: h.j, k: o.k, dw: eta * o.error * o.sigma_prime * h.sigma_z,
+              ek: o.error, spk: o.sigma_prime, shj: h.sigma_z });
+  }));
+  ho.sort((a,b) => Math.abs(b.dw) - Math.abs(a.dw));
+  const posHO = ho.filter(u => u.dw > 0).length;
+  const negHO = ho.filter(u => u.dw < 0).length;
+  const hoRows = ho.slice(0,12).map(u => {
+    const clr = u.dw >= 0 ? 'var(--green)' : 'var(--accent2)';
+    const dir = u.dw >= 0 ? '▲ refuerza' : '▼ reduce';
+    return `<tr>
+      <td>${u.j}</td><td>${u.k}</td>
+      <td>${u.ek.toFixed(4)}</td><td>${u.spk.toFixed(4)}</td><td>${u.shj.toFixed(4)}</td>
+      <td style="color:${clr};font-weight:600">${u.dw >= 0 ? '+' : ''}${u.dw.toFixed(6)}</td>
+      <td style="color:${clr};font-size:.7rem">${dir}</td>
+    </tr>`;
+  }).join('');
+
+  // Top 8 ΔW en I→H (solo píxeles activos)
+  const ih = [];
+  d.hidden.forEach(h => d.inputs.forEach((xi, i) => {
+    if (xi === 0) return;
+    const dw = eta * h.error * h.sigma_prime * xi;
+    if (Math.abs(dw) > 1e-8) ih.push({ i, j: h.j, dw, xi, ej: h.error, spj: h.sigma_prime });
+  }));
+  ih.sort((a,b) => Math.abs(b.dw) - Math.abs(a.dw));
+  const ihRows = ih.slice(0,8).map(u => {
+    const clr = u.dw >= 0 ? 'var(--green)' : 'var(--accent2)';
+    return `<tr>
+      <td>${u.i}</td><td>${u.j}</td>
+      <td>${u.ej.toFixed(4)}</td><td>${u.spj.toFixed(4)}</td><td>${u.xi.toFixed(4)}</td>
+      <td style="color:${clr};font-weight:600">${u.dw >= 0 ? '+' : ''}${u.dw.toFixed(6)}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="edu-step-panel">
+    <div class="edu-explanation">
+      <strong>¿Qué hace la red en este paso?</strong><br>
+      Se calculan los cambios <strong>ΔW</strong> para cada peso de la red y se aplican.
+      La fórmula es: <em>w_nuevo = w_viejo + ΔW</em>.<br>
+      • <span style="color:var(--green)">ΔW positivo (verde ▲)</span> = el peso crece → la conexión se refuerza.<br>
+      • <span style="color:var(--accent2)">ΔW negativo (rojo ▼)</span> = el peso se reduce → la conexión se debilita.<br>
+      La tasa de aprendizaje η = <strong>${eta}</strong> controla cuánto cambia cada paso.
+      <br><span class="edu-formula">ΔWⱼₖ = η·eₖ·σ'(zₖ)·σ(zⱼ) · ΔWᵢⱼ = η·eⱼ·σ'(zⱼ)·xᵢ</span>
+    </div>
+    <div style="margin-bottom:8px;padding:8px 14px;background:var(--surface2);border-radius:6px;font-size:.8rem;display:flex;gap:20px;flex-wrap:wrap;">
+      <span>H→O: <span style="color:var(--green)">${posHO} pesos ▲</span> / <span style="color:var(--accent2)">${negHO} pesos ▼</span> (de 640 total)</span>
+      <span>I→H: <strong>${ih.length}</strong> pesos con xᵢ>0 de 50 176 total</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <div>
+        <div style="font-size:.7rem;color:var(--muted);margin-bottom:6px;">H→O — Top 12 |ΔW| (de 640 pesos)</div>
+        <div class="trace-table-wrap" style="max-height:220px;">
+          <table class="trace-table">
+            <thead><tr><th>j</th><th>k</th><th>e_k</th><th>σ'</th><th>h_j</th><th>ΔW_jk</th><th></th></tr></thead>
+            <tbody>${hoRows}</tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:.7rem;color:var(--muted);margin-bottom:6px;">I→H — Top 8 |ΔW| (solo píxeles activos)</div>
+        <div class="trace-table-wrap" style="max-height:220px;">
+          <table class="trace-table">
+            <thead><tr><th>pix i</th><th>neur j</th><th>e_j</th><th>σ'</th><th>xᵢ</th><th>ΔW_ij</th></tr></thead>
+            <tbody>${ihRows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px;padding:10px 14px;background:rgba(67,233,123,.08);border-radius:6px;font-size:.8rem;color:var(--green);">
+      ✅ <strong>¿Qué pasa al presionar "Aplicar Pesos"?</strong>
+      Se ejecuta un paso de SGD: todos los ΔW se suman a sus pesos correspondientes.
+      Después de muchos pasos (épocas) con distintas imágenes, la red aprende a reconocer dígitos.
+    </div>
+  </div>`;
+}
+
+function eduApply() {
+  const btn = document.getElementById('btn-edu-apply');
+  btn.disabled = true;
+  btn.style.opacity = '.45';
+  fetch('/api/edu/apply', { method: 'POST' })
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) { alert('Error: ' + d.error); btn.disabled = false; btn.style.opacity = '1'; return; }
+      document.getElementById('edu-status').textContent = `✓ Pesos aplicados — épocas acum.: ${d.epocas_entrenadas}`;
+      document.getElementById('s-epoch').textContent    = d.epocas_entrenadas;
+      refreshNetwork();
+      // Resetear para nueva muestra
+      eduData = null;
+      document.getElementById('panel-edu-steps').style.display = 'none';
+      document.getElementById('edu-status').textContent =
+        `✓ Pesos aplicados. Carga otra muestra para continuar entrenando.`;
+    })
+    .catch(e => { alert('Error de red: ' + e.message); });
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── *
+ *  INIT
+ * ─────────────────────────────────────────────────────────────────────────── */
+window.addEventListener('load', () => {  // Inicializar el slider de tasa de aprendizaje
+  const slider = document.getElementById('inp-tasa');
+  document.getElementById('tasa-lbl').textContent =
+    Math.pow(10, +slider.value).toFixed(4);
+
+  slider.addEventListener('input', () => {
+    const v = Math.pow(10, +slider.value).toFixed(4);
+    document.getElementById('tasa-lbl').textContent = v;
+    document.getElementById('tasa-val').textContent  = 'η = ' + v;
+  });
+
+  // Activar vista predict por defecto
+  showView('predict');
+  // Dibujar la red al cargar (tab Entrenar cargado en background)
+  refreshNetwork();
+
+  window.addEventListener('resize', () => {
+    const active = document.querySelector('.view.active');
+    if (!active) return;
+    if (active.id === 'view-train')   { drawLossChart(); refreshNetwork(); }
+    if (active.id === 'view-predict') { /* network moved to train tab */ }
+  });
+});
+</script>
+</body>
+</html>
