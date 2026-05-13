@@ -1,13 +1,10 @@
 """
+=====================================================
 mnist.py — Descarga y preparación del dataset MNIST
 =====================================================
 Usa únicamente urllib, gzip, struct y numpy (todos permitidos/built-in).
 Los archivos se guardan en .mnist_cache/ junto al proyecto para que
 solo se descarguen una vez.
-
-Retorna listas de (vector_784_float32, etiqueta_int):
-  entrenamiento : 60 000 muestras
-  prueba        :  10 000 muestras
 """
 
 from __future__ import annotations
@@ -16,10 +13,6 @@ from typing import List, Tuple
 
 import numpy as np
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  cargar_mnist
-# ══════════════════════════════════════════════════════════════════════════════
 
 def cargar_mnist() -> Tuple[
     List[Tuple[np.ndarray, int]],
@@ -31,11 +24,6 @@ def cargar_mnist() -> Tuple[
 
     Los archivos se guardan en  .mnist_cache/  junto al script para que
     solo se descarguen una vez.
-
-    Retorna
-    -------
-    entrenamiento : list of (vector_784_float32, etiqueta_int)  — 60 000 muestras
-    prueba        : list of (vector_784_float32, etiqueta_int)  —  10 000 muestras
     """
     import gzip
     import os

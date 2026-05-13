@@ -1,22 +1,3 @@
-"""
-red.py — Red Neuronal MLP 784 → 64 → 10
-=========================================
-Perceptrón Multicapa (MLP) para reconocimiento de dígitos escritos a mano.
-
-Arquitectura
-------------
-  Input  : 784 nodos  (imagen 28×28 normalizada)
-  Hidden :  64 nodos  (Sigmoid)
-  Output :  10 nodos  (Sigmoid, uno por dígito 0-9)
-
-Flujo de uso
-------------
-  red = RedNeuronal(tasa_aprendizaje=0.1, semilla=42)
-  red.entrenar_numpy(datos_train, epocas=10)
-  digito, confianzas = red.predecir_con_confianza(vector_784)
-  red.guardar_pesos("pesos")
-"""
-
 from __future__ import annotations
 
 import random
@@ -28,26 +9,7 @@ from .activaciones import TipoNodo
 from .capa import Capa
 from .conexion import Conexion
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  RedNeuronal  (MLP 784 → 64 → 10)
-# ══════════════════════════════════════════════════════════════════════════════
-
 class RedNeuronal:
-    """
-    Perceptrón Multicapa (MLP) para reconocimiento de dígitos escritos a mano.
-
-    Arquitectura
-    ------------
-      Input  : 784 nodos  (imagen 28×28 normalizada)
-      Hidden :  64 nodos  (Sigmoid)
-      Output :  10 nodos  (Sigmoid, uno por dígito 0-9)
-
-    Parámetros
-    ----------
-    tasa_aprendizaje : η, por defecto 0.1
-    semilla          : semilla aleatoria para reproducibilidad (opcional)
-    """
 
     def __init__(
         self,
@@ -63,19 +25,16 @@ class RedNeuronal:
         self.historial_loss:   List[float] = []
         self.historial_acc:    List[float] = []
 
-        # ── Crear las tres capas ──────────────────────────────────────────────
+        # -- Crear las tres capas ----------------
         self.capa_input  = Capa(TipoNodo.INPUT,  784)
         self.capa_hidden = Capa(TipoNodo.HIDDEN,  64)
         self.capa_output = Capa(TipoNodo.OUTPUT,  10)
 
-        # ── Conectar fully-connected: INPUT→HIDDEN y HIDDEN→OUTPUT ────────────
+        # -- Conectar ----------------
         self._conectar(self.capa_input,  self.capa_hidden)
         self._conectar(self.capa_hidden, self.capa_output)
 
-    # ══════════════════════════════════════════════════════════════════════════
-    #  Construcción de topología
-    # ══════════════════════════════════════════════════════════════════════════
-
+    # Construcción de topología
     def _conectar(self, origen: Capa, destino: Capa) -> None:
         """Crea conexiones fully-connected entre dos capas adyacentes."""
         for nodo_o in origen.nodos:
@@ -84,15 +43,12 @@ class RedNeuronal:
                 nodo_o.conexiones_salida.append(c)
                 nodo_d.conexiones_entrada.append(c)
 
-    # ══════════════════════════════════════════════════════════════════════════
-    #  Utilidades internas
-    # ══════════════════════════════════════════════════════════════════════════
-
+    # Utilidades internas
     def _set_input(self, vector: np.ndarray) -> None:
         """Carga el vector de 784 valores en los nodos de entrada."""
         for i, nodo in enumerate(self.capa_input.nodos):
             nodo.valor = float(vector[i])
-            nodo.z     = float(vector[i])   # z = valor directo en capa INPUT
+            nodo.z     = float(vector[i])
 
     def _reset_errores(self) -> None:
         """Reinicia errores de nodos y conexiones antes de cada muestra."""
@@ -102,20 +58,14 @@ class RedNeuronal:
                 for c in nodo.conexiones_salida:
                     c.error = 0.0
 
-    # ══════════════════════════════════════════════════════════════════════════
-    #  Forward Propagation
-    # ══════════════════════════════════════════════════════════════════════════
-
+    # Forward Propagation
     def _forward(self, vector: np.ndarray) -> None:
         """Propagación hacia adelante: INPUT → HIDDEN → OUTPUT."""
         self._set_input(vector)
         self.capa_hidden.forward()
         self.capa_output.forward()
 
-    # ══════════════════════════════════════════════════════════════════════════
-    #  Error en capa Output (MSE simplificado)
-    # ══════════════════════════════════════════════════════════════════════════
-
+    # Error en capa Output
     def _calcular_error_output(self, etiqueta: int) -> float:
         """
         Para cada nodo output:
@@ -133,46 +83,14 @@ class RedNeuronal:
             loss      += 0.5 * error * error
         return loss
 
-    # ══════════════════════════════════════════════════════════════════════════
-    #  Backpropagation
-    # ══════════════════════════════════════════════════════════════════════════
-
+    # Backpropagation — repartir errores hacia atrás
     def _backprop(self) -> None:
-        """
-        Paso 1 — capa_hidden.propagar_error():
-            Usa los errores de los nodos OUTPUT (ya calculados).
-            → Almacena error en cada conexión HID→OUT.
-            → Acumula error total en cada nodo HIDDEN.
-
-        Paso 2 — capa_input.propagar_error():
-            Usa los errores de los nodos HIDDEN (recién calculados).
-            → Almacena error en cada conexión IN→HID.
-            → Acumula error total en cada nodo INPUT (informativo).
-        """
         self.capa_hidden.propagar_error()   # usa errores de OUTPUT
         self.capa_input.propagar_error()    # usa errores de HIDDEN
-
-    # ══════════════════════════════════════════════════════════════════════════
-    #  Gradiente Descendente — actualización de pesos
-    # ══════════════════════════════════════════════════════════════════════════
-
+    
+    # Gradiente Descendente — actualización de pesos
     def _actualizar_pesos(self) -> None:
-        """
-        Para cada conexión:
-
-          ΔW = η × ej × σ(z_destino) × (1 − σ(z_destino)) × valor_origen
-          W  ← W + ΔW
-
-        donde:
-          ej      = nodo_destino.error  (error directo del nodo, no distribuido)
-          Para HID→OUT : ej = esperado − obtenido       (calculado en output)
-          Para IN→HID  : ej = nodo_hidden.error         (acumulado en backprop)
-
-        Usar nodo_destino.error (no c.error) es crítico:
-        c.error lleva el error ya multiplicado por (peso/Σ|pesos|),
-        lo que divide el gradiente y destruye la señal de aprendizaje.
-        """
-        # ── Conexiones HIDDEN → OUTPUT ────────────────────────────────────────
+        # -- Conexiones HIDDEN -> OUTPUT ------------------------------------
         for nodo_h in self.capa_hidden.nodos:
             for c in nodo_h.conexiones_salida:
                 nodo_o = c.nodo_destino
@@ -183,7 +101,7 @@ class RedNeuronal:
                 )
                 c.peso += self.tasa_aprendizaje * delta
 
-        # ── Conexiones INPUT → HIDDEN ─────────────────────────────────────────
+        # -- Conexiones INPUT -> HIDDEN ------------------------------------
         for nodo_i in self.capa_input.nodos:
             for c in nodo_i.conexiones_salida:
                 nodo_h = c.nodo_destino
@@ -194,29 +112,19 @@ class RedNeuronal:
                 )
                 c.peso += self.tasa_aprendizaje * delta
 
-    # ══════════════════════════════════════════════════════════════════════════
-    #  Modo Debug
-    # ══════════════════════════════════════════════════════════════════════════
-
+    # Modo Debug
     def _debug_iteracion(self, etiqueta: int) -> None:
-        """
-        Imprime z, sigmoid(z), error y delta_peso de un nodo por capa,
-        con 4 decimales de precisión.
-
-        Llamar DESPUÉS de _backprop() y ANTES de _actualizar_pesos() para
-        observar los valores exactos que se usarán en la actualización.
-        """
         sep = "═" * 65
         print(f"\n{sep}")
         print("  MODO DEBUG — PASO A PASO  (1 muestra, antes de actualizar W)")
         print(f"{sep}")
 
-        # ── CAPA INPUT: nodo central de la imagen (índice 392) ────────────────
+        # -- CAPA INPUT: nodo central de la imagen (índice 392) -------------------
         n_in = self.capa_input.nodos[392]
         print(f"\n▶ [INPUT]  Nodo 392")
         print(f"   valor (píxel normalizado) = {n_in.valor:.4f}")
 
-        # ── CAPA HIDDEN: nodo 0 ───────────────────────────────────────────────
+        # -- CAPA HIDDEN: nodo 0 -------------------------------------------------
         n_h   = self.capa_hidden.nodos[0]
         c_i2h = n_h.conexiones_entrada[392]   # conexión IN[392] → HID[0]
 
@@ -234,7 +142,7 @@ class RedNeuronal:
         print(f"      error_conexion     = {c_i2h.error:.4f}")
         print(f"      ΔW (pre-update)    = {self.tasa_aprendizaje * delta_i2h:.4f}")
 
-        # ── CAPA OUTPUT: nodo == etiqueta ─────────────────────────────────────
+        # -- CAPA OUTPUT: nodo == etiqueta ----------------------------------------
         n_o   = self.capa_output.nodos[etiqueta]
         c_h2o = n_o.conexiones_entrada[0]     # conexión HID[0] → OUT[etiqueta]
 
@@ -254,10 +162,7 @@ class RedNeuronal:
 
         print(f"\n{sep}\n")
 
-    # ══════════════════════════════════════════════════════════════════════════
-    #  Entrenar (SGD por objetos)
-    # ══════════════════════════════════════════════════════════════════════════
-
+    # Entrenar
     def entrenar(
         self,
         datos:          List[Tuple[np.ndarray, int]],
@@ -265,21 +170,6 @@ class RedNeuronal:
         debug_primera:  bool = False,
         verbose:        bool = True,
     ) -> List[float]:
-        """
-        Entrena la red mediante Gradiente Descendente Estocástico (SGD).
-
-        Parámetros
-        ----------
-        datos          : lista de (vector_784_float32, etiqueta_int)
-        epocas         : número de épocas de entrenamiento
-        debug_primera  : si True → imprime debug en la primera muestra de
-                         la primera época (antes de actualizar pesos)
-        verbose        : si True → muestra loss y accuracy al final de cada época
-
-        Retorna
-        -------
-        historial_loss : lista con el loss promedio de cada época
-        """
         for epoca in range(1, epocas + 1):
             loss_total = 0.0
             correctos  = 0
@@ -325,51 +215,18 @@ class RedNeuronal:
 
         return self.historial_loss
 
-    # ══════════════════════════════════════════════════════════════════════════
-    #  Entrenar rápido (numpy vectorizado) — misma matemática, 100-1000× más veloz
-    # ══════════════════════════════════════════════════════════════════════════════
-
+    # Entrenar rápido con numpy
     def entrenar_numpy(
         self,
         datos:   List[Tuple[np.ndarray, int]],
         epocas:  int  = 10,
         verbose: bool = True,
     ) -> List[float]:
-        """
-        Idéntica matemática que entrenar(), pero usa matrices numpy en vez de
-        iterar sobre objetos Conexion. Velocidad ~100-1000× mayor.
-
-        Matemática implementada (igual que la versión por objetos):
-        ─────────────────────────────────────────────────────────────
-        Forward:
-          z1 = W_ih.T @ x        (784→64)
-          a1 = σ(z1)
-          z2 = W_ho.T @ a1       (64→10)
-          a2 = σ(z2)
-
-        Error output:
-          e2 = y_onehot − a2
-          loss += ½ ‖e2‖²
-
-        Actualización HID→OUT:
-          ΔW_ho = η × outer(a1, e2 * a2*(1−a2))
-
-        Error hidden (fórmula del profesor: distribuir por fracción de peso):
-          col_abs_sum = Σ_h |W_ho[h,o]|   para cada o
-          W_norm[h,o] = W_ho[h,o] / col_abs_sum[o]
-          e1[h]       = Σ_o W_norm[h,o] × e2[o]   = W_norm @ e2
-
-        Actualización IN→HID:
-          ΔW_ih = η × outer(x, e1 * a1*(1−a1))
-
-        Al terminar sincroniza los pesos a los objetos Conexion para que
-        predecir(), _debug_iteracion() y guardar_pesos() sigan funcionando.
-        """
 
         def _sig(z: np.ndarray) -> np.ndarray:
             return 1.0 / (1.0 + np.exp(-np.clip(z, -500.0, 500.0)))
 
-        # ── Extraer pesos a matrices numpy ────────────────────────────────────
+        # -- Extraer pesos a matrices numpy ------------------------------------
         W_ih = np.array(
             [[c.peso for c in n.conexiones_salida] for n in self.capa_input.nodos],
             dtype=np.float64,
@@ -381,7 +238,7 @@ class RedNeuronal:
 
         y_cache = np.eye(10, dtype=np.float64)  # one-hot lookup
 
-        # ── Bucle de entrenamiento ────────────────────────────────────────────
+        # -- Bucle de entrenamiento ---------------------------------------------
         for epoca in range(1, epocas + 1):
             loss_total = 0.0
             correctos  = 0
@@ -398,7 +255,7 @@ class RedNeuronal:
                 e2 = yv - a2                             # (10,)
                 loss_total += 0.5 * float(np.dot(e2, e2))
 
-                # Actualización HID→OUT
+                # Actualización HID -> OUT
                 grad_o  = e2 * a2 * (1.0 - a2)          # (10,)  δ_output
 
                 # Error en hidden (fórmula del profesor)
@@ -407,7 +264,7 @@ class RedNeuronal:
 
                 W_ho   += self.tasa_aprendizaje * np.outer(a1, grad_o)
 
-                # Actualización IN→HID
+                # Actualización IN -> HID
                 grad_h  = e1 * a1 * (1.0 - a1)          # (64,)  δ_hidden
                 W_ih   += self.tasa_aprendizaje * np.outer(x, grad_h)
 
@@ -426,7 +283,7 @@ class RedNeuronal:
                     f"Accuracy={accuracy:.2f}%"
                 )
 
-        # ── Sincronizar pesos de vuelta a los objetos Conexion ────────────────
+        # -- Sincronizar pesos de vuelta a los objetos Conexion -----------------
         for i, nodo in enumerate(self.capa_input.nodos):
             for j, c in enumerate(nodo.conexiones_salida):
                 c.peso = float(W_ih[i, j])
@@ -437,22 +294,8 @@ class RedNeuronal:
 
         return self.historial_loss
 
-    # ══════════════════════════════════════════════════════════════════════════
-    #  Predecir
-    # ══════════════════════════════════════════════════════════════════════════
-
+    # Predecir
     def predecir(self, vector_784: np.ndarray) -> int:
-        """
-        Realiza inferencia y retorna el dígito con mayor activación.
-
-        Parámetros
-        ----------
-        vector_784 : ndarray de 784 floats en [0.0, 1.0]
-
-        Retorna
-        -------
-        int : dígito predicho (0-9)
-        """
         self._reset_errores()
         self._forward(vector_784)
         salidas = [n.valor for n in self.capa_output.nodos]
@@ -471,10 +314,7 @@ class RedNeuronal:
         salidas = [n.valor for n in self.capa_output.nodos]
         return int(np.argmax(salidas)), salidas
 
-    # ══════════════════════════════════════════════════════════════════════════
-    #  Persistencia de pesos
-    # ══════════════════════════════════════════════════════════════════════════
-
+    # Persistencia de pesos
     def guardar_pesos(self, ruta: str) -> None:
         """
         Guarda los pesos en formato .npz de numpy.
