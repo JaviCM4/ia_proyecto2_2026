@@ -1,19 +1,3 @@
-"""
-app.py — Interfaz web Flask para la Red Neuronal de reconocimiento de dígitos
-==============================================================================
-Ejecutar : python app.py
-Acceder  : http://localhost:5000
-
-Rutas
------
-GET  /                      → página principal
-GET  /api/status            → estado actual de la red
-POST /api/train/start       → inicia entrenamiento en hilo separado
-GET  /api/train/stream      → SSE: progreso de entrenamiento en tiempo real
-POST /api/predict           → predice dígito desde imagen base64 (webcam)
-GET  /api/network           → pesos y activaciones para visualización
-"""
-
 from __future__ import annotations
 
 import base64
@@ -33,10 +17,8 @@ from neural_network import RedNeuronal, cargar_mnist
 
 app = Flask(__name__)
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  Bitácora de matrices de pesos
-# ─────────────────────────────────────────────────────────────────────────────
 
+#  Bitácora de matrices de pesos
 _ARCHIVO_BITACORA = "bitacora_matrices.log"
 _EPOCAS_BITACORA  = {1, 50, 100}
 
@@ -78,14 +60,13 @@ def _guardar_bitacora_matrices(red: RedNeuronal, epoca: int, total_epocas: int) 
         f.write("\n")
     print(f"  [Bitacora] Epoca {epoca} -> {_ARCHIVO_BITACORA}")
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  Estado global  (thread-safe mediante lock)
-# ─────────────────────────────────────────────────────────────────────────────
 
+#  Estado global  (thread-safe mediante lock)
 class _State:
     def __init__(self) -> None:
         self.lock             = threading.Lock()
         self.red              = RedNeuronal(tasa_aprendizaje=0.1, semilla=42)
+        self.red_edu          = RedNeuronal(tasa_aprendizaje=0.1, semilla=None)  # pesos aleatorios para modo educativo
         self.mnist            : Optional[tuple]      = None
         self.training_active  : bool                 = False
         self.sse_clients      : List[queue.Queue]    = []
@@ -104,10 +85,7 @@ else:
     print("[App] Sin pesos previos — usa el panel de entrenamiento.")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 #  Broadcast SSE
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _broadcast(data: dict) -> None:
     """Envía un evento JSON a todos los clientes SSE conectados."""
     msg = json.dumps(data)
@@ -118,10 +96,7 @@ def _broadcast(data: dict) -> None:
             pass
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 #  Worker de entrenamiento  (hilo daemon)
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _training_worker(epocas: int, tasa: float) -> None:
     try:
         # Nueva red desde cero con la tasa solicitada
@@ -183,10 +158,7 @@ def _training_worker(epocas: int, tasa: float) -> None:
             S.training_active = False
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 #  Preprocesado de cámara
-# ─────────────────────────────────────────────────────────────────────────────
-
 def procesar_frame(frame):
     # 1. Escala de grises
     gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -236,10 +208,7 @@ def procesar_frame(frame):
     return vector, imagen_28
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 #  Rutas
-# ─────────────────────────────────────────────────────────────────────────────
-
 @app.route("/")
 def index():
     pesos_exist = os.path.exists(S.pesos_path + ".npz")
@@ -590,10 +559,7 @@ def api_export_trace():
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 #  Modo Educativo  (paso a paso)
-# ─────────────────────────────────────────────────────────────────────────────
-
 @app.route("/api/edu/sample")
 def api_edu_sample():
     """
@@ -622,10 +588,10 @@ def api_edu_sample():
         sample_vec, label = _rnd.choice(test)
 
     with S.lock:
-        S.red._reset_errores()
-        S.red._forward(sample_vec)
-        loss = S.red._calcular_error_output(label)
-        S.red._backprop()
+        S.red_edu._reset_errores()
+        S.red_edu._forward(sample_vec)
+        loss = S.red_edu._calcular_error_output(label)
+        S.red_edu._backprop()
         S.edu_computed = True
 
         hidden_data = [
@@ -636,7 +602,7 @@ def api_edu_sample():
                 "sigma_prime": round(float(n.valor * (1 - n.valor)), 6),
                 "error"      : round(float(n.error),                 6),
             }
-            for j, n in enumerate(S.red.capa_hidden.nodos)
+            for j, n in enumerate(S.red_edu.capa_hidden.nodos)
         ]
         output_data = [
             {
@@ -648,14 +614,14 @@ def api_edu_sample():
                 "error"      : round(float(n.error),                 6),
                 "half_e2"    : round(0.5 * float(n.error) ** 2,      8),
             }
-            for k, n in enumerate(S.red.capa_output.nodos)
+            for k, n in enumerate(S.red_edu.capa_output.nodos)
         ]
 
         # Actualizar last_activations para que el canvas de red refleje esta muestra
         S.last_activations = {
             "input" : [round(float(v), 6) for v in sample_vec],
-            "hidden": [round(float(n.valor), 4) for n in S.red.capa_hidden.nodos],
-            "output": [round(float(n.valor), 4) for n in S.red.capa_output.nodos],
+            "hidden": [round(float(n.valor), 4) for n in S.red_edu.capa_hidden.nodos],
+            "output": [round(float(n.valor), 4) for n in S.red_edu.capa_output.nodos],
         }
 
     return jsonify({
@@ -674,13 +640,12 @@ def api_edu_apply():
     with S.lock:
         if not S.edu_computed:
             return jsonify({"error": "No hay cálculo pendiente. Llama /api/edu/sample primero."}), 400
-        S.red._actualizar_pesos()
+        S.red_edu._actualizar_pesos()
         S.edu_computed = False
-        ep = len(S.red.historial_loss)
+        ep = len(S.red_edu.historial_loss)
     return jsonify({"ok": True, "epocas_entrenadas": ep})
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     print("[App] Servidor Flask → http://localhost:5000")
     app.run(debug=False, threaded=True, host="0.0.0.0", port=5000)
